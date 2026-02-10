@@ -91,17 +91,29 @@
   background-image: 
     /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
-    /* Left edge shadow (curves away) */
-    radial-gradient(ellipse 100% 120% at 0% 50%, rgba(0,0,0,0.35), transparent 50%),
-    /* Right edge shadow (curves away) */
-    radial-gradient(ellipse 100% 120% at 100% 50%, rgba(0,0,0,0.35), transparent 50%),
-    /* Center highlight (bulges toward viewer) */
+    /* Deep left edge shadow (curves away from viewer) */
+    radial-gradient(ellipse 80% 100% at 0% 50%, 
+      rgba(0,0,0,0.6) 0%, 
+      rgba(0,0,0,0.4) 25%,
+      rgba(0,0,0,0.1) 45%,
+      transparent 60%
+    ),
+    /* Deep right edge shadow (curves away from viewer) */
+    radial-gradient(ellipse 80% 100% at 100% 50%, 
+      rgba(0,0,0,0.6) 0%, 
+      rgba(0,0,0,0.4) 25%,
+      rgba(0,0,0,0.1) 45%,
+      transparent 60%
+    ),
+    /* Bright center highlight (top of cylinder catching light) */
     linear-gradient(90deg, 
-      var(--timeline-paper-shadow) 0%,
-      var(--timeline-paper-base) 20%,
-      var(--timeline-paper-highlight) 50%,
-      var(--timeline-paper-base) 80%,
-      var(--timeline-paper-shadow) 100%
+      hsl(45, 18%, 55%) 0%,
+      hsl(45, 22%, 68%) 15%,
+      hsl(45, 28%, 80%) 35%,
+      hsl(45, 35%, 88%) 50%,
+      hsl(45, 28%, 80%) 65%,
+      hsl(45, 22%, 68%) 85%,
+      hsl(45, 18%, 55%) 100%
     );
   
   /* Cylinder edge definition */
