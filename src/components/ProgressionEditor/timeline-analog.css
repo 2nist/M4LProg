@@ -87,10 +87,17 @@
   width: 100%;
   min-height: 120px;
   
-  /* Layered background: texture + cylindrical gradient */
+  /* Layered background: texture + cylindrical gradient + vertical vignette */
   background-image: 
     /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
+    /* Vertical vignette (cylinder curves away from viewer at top and bottom) */
+    linear-gradient(180deg,
+      rgba(0,0,0,0.2) 0%,
+      transparent 20%,
+      transparent 80%,
+      rgba(0,0,0,0.2) 100%
+    ),
     /* Left edge shadow (straight horizontal fall toward center, uniform top-to-bottom) */
     linear-gradient(90deg,
       rgba(0,0,0,1.0) 0%, 
@@ -253,9 +260,10 @@
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 6px;
   
-  /* Subtle shadow */
+  /* Card lift shadow - floats above cylinder surface */
   box-shadow: 
-    0 2px 6px rgba(0, 0, 0, 0.15),
+    0 3px 8px rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   
   cursor: pointer;
@@ -265,17 +273,18 @@
   transition: all var(--timeline-transition-smooth);
 }
 
-/* Hover state - light moves closer */
+/* Hover state - card lifts higher */
 .section-card:hover {
   background: rgba(0, 0, 0, 0.08);
   
   border-color: rgba(0, 0, 0, 0.25);
   
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 6px 16px rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
   
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 /* Selected state - warm spotlight */
