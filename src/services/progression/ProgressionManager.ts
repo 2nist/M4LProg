@@ -121,6 +121,7 @@ export const DEFAULT_PATTERNS: Pattern[] =
  */
 export function createEmptySection(name: string = "New Section"): Section {
   return {
+    id: crypto.randomUUID(),
     name,
     progression: [],
     // default: repeat once, common 4/4 time signature
@@ -139,6 +140,7 @@ export function createEmptySection(name: string = "New Section"): Section {
  */
 export function cloneSection(section: Section): Section {
   return {
+    id: section.id,
     name: section.name,
     progression: cloneProgression(section.progression),
     rootHeld: section.rootHeld,
@@ -163,6 +165,19 @@ export function cloneProgression(progression: Progression = []): Progression {
     duration: chord.duration,
     metadata: chord.metadata ? { ...chord.metadata } : undefined,
   }));
+}
+
+/**
+ * Flatten sections with repeats into a single progression
+ * Expands each section's progression according to its repeat count
+ * @param sections - Array of sections to flatten
+ * @returns Flattened progression with all repeats expanded
+ */
+export function flattenSectionsWithRepeats(sections: Section[]): Progression {
+  return sections.flatMap(section => {
+    const repeatCount = section.repeats || 1;
+    return Array(repeatCount).fill(section.progression).flat();
+  });
 }
 
 // ============================================================================

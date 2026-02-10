@@ -68,6 +68,12 @@ interface ProgressionState {
   /** Rename current section */
   renameSection: (name: string) => void;
 
+  /** Reorder a section (drag/drop or keyboard) */
+  reorderSection: (fromIndex: number, toIndex: number) => void;
+
+  /** Duplicate a section */
+  duplicateSection: (index: number) => void;
+
   // ============================================================================
   // Progression Editing
   // ============================================================================
@@ -238,6 +244,52 @@ export const useProgressionStore = create<ProgressionState>()(
           ...newSections[currentSectionIndex],
           name,
         };
+        set({ sections: newSections });
+      },
+
+      reorderSection: (fromIndex: number, toIndex: number) => {
+        const { sections, currentSectionIndex } = get();
+        if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= sections.length || toIndex < 0 || toIndex >= sections.length) {
+          return;
+        }
+
+        const newSections = [...sections];
+        const [movedSection] = newSections.splice(fromIndex, 1);
+        newSections.splice(toIndex, 0, movedSection);
+
+        // Update current section index if needed
+        let newCurrentIndex = currentSectionIndex;
+        if (currentSectionIndex === fromIndex) {
+          newCurrentIndex = toIndex;
+        } else if (fromIndex < currentSectionIndex && toIndex >= currentSectionIndex) {
+          newCurrentIndex = currentSectionIndex - 1;
+        } else if (fromIndex > currentSectionIndex && toIndex <= currentSectionIndex) {
+          newCurrentIndex = currentSectionIndex + 1;
+        }
+
+        set({
+          sections: newSections,
+          currentSectionIndex: newCurrentIndex,
+        });
+      },
+
+      duplicateSection: (index: number) => {
+        const { sections } = get();
+        if (index < 0 || index >= sections.length) return;
+
+        const sectionToDuplicate = sections[index];
+        const duplicated = {
+          ...ProgressionManager.cloneSection(sectionToDuplicate),
+          id: crypto.randomUUID(), // New UUID for duplicate
+          name: `${sectionToDuplicate.name} (Copy)`,
+        };
+
+        const newSections = [
+          ...sections.slice(0, index + 1),
+          duplicated,
+          ...sections.slice(index + 1),
+        ];
+
         set({ sections: newSections });
       },
 

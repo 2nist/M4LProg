@@ -20,6 +20,7 @@ import type { ChordQuality } from "@/types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
 import ProgressionStrip from "./ProgressionStrip";
+import { LoopTimeline } from "./LoopTimeline";
 
 // ATOM SQ Constants
 const PAD_COUNT = 16;
@@ -373,7 +374,7 @@ export function ProgressionEditor() {
         </div>
 
         {/* Right Content Area */}
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-col flex-1 overflow-hidden progression-editor-content">
           {/* Header intentionally removed: info moved to left toolbar */}
 
           {/* Encoders Card (CC 14-21) */}
@@ -752,28 +753,8 @@ export function ProgressionEditor() {
         </div>
       </div>
 
-      {/* Timeline Footer - Full Width Static (Bottom of Window) */}
-      <div className="h-30 px-6 py-4 panel border-t shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold muted-text">
-            Timeline: Progression Slots
-          </h3>
-          <button
-            onClick={() => setShowSaveModal(true)}
-            disabled={progression.length === 0}
-            className="px-3 py-1.5 rounded btn-primary disabled:opacity-50 text-xs font-medium flex items-center gap-2 transition-colors"
-          >
-            <Save size={14} />
-            Save
-          </button>
-        </div>
-
-        <div className="flex items-center justify-center h-24 border border-gray-700 border-dashed rounded-lg">
-          <div className="text-sm text-center muted-text">
-            Song timeline placeholder — sections will appear here
-          </div>
-        </div>
-      </div>
+      {/* Expandable Timeline */}
+      <LoopTimeline />
 
       {/* Modals */}
       <InputModal

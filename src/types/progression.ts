@@ -29,6 +29,9 @@ export interface TransitionConfig {
  * A section of a song with its own progression
  */
 export interface Section {
+  /** Unique identifier for this section */
+  id: string;
+
   /** Section name (e.g., "Verse 1", "Chorus") */
   name: string;
 
