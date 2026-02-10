@@ -87,14 +87,21 @@
   width: 100%;
   min-height: 120px;
   
-  /* Layered background: texture + gradient */
+  /* Layered background: texture + cylindrical gradient */
   background-image: 
+    /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
-    linear-gradient(
-      to bottom,
-      var(--timeline-paper-highlight),
-      var(--timeline-paper-base),
-      var(--timeline-paper-shadow)
+    /* Left edge shadow (curves away) */
+    radial-gradient(ellipse 100% 120% at 0% 50%, rgba(0,0,0,0.35), transparent 50%),
+    /* Right edge shadow (curves away) */
+    radial-gradient(ellipse 100% 120% at 100% 50%, rgba(0,0,0,0.35), transparent 50%),
+    /* Center highlight (bulges toward viewer) */
+    linear-gradient(90deg, 
+      var(--timeline-paper-shadow) 0%,
+      var(--timeline-paper-base) 20%,
+      var(--timeline-paper-highlight) 50%,
+      var(--timeline-paper-base) 80%,
+      var(--timeline-paper-shadow) 100%
     );
   
   /* Cylinder edge definition */
