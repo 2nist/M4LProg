@@ -5,15 +5,17 @@
  * Features: drag-to-resize, multiple view modes, drag-drop sections
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { ChevronUp, ChevronDown, Maximize2, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { useExpandableTimeline, TimelineMode } from '../../hooks/useExpandableTimeline';
 import { useProgressionStore } from '../../stores/progressionStore';
+import { useLiveStore } from '../../stores/liveStore';
 import './timeline-analog.css';
 
 export function LoopTimeline() {
   const { sections, reorderSection } = useProgressionStore();
+  const { transport } = useLiveStore();
   
   const {
     mode,
@@ -30,14 +32,50 @@ export function LoopTimeline() {
     },
   });
 
-  // Playhead state (will be controlled by transport)
-  const [currentBeat, setCurrentBeat] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  // Use transport state from Live
+  const currentBeat = transport.currentBeat;
+  const isPlaying = transport.isPlaying;
 
   // Calculate current bar:beat position
   const beatsPerBar = 4;
   const currentBar = Math.floor(currentBeat / beatsPerBar) + 1;
   const currentBeatInBar = (currentBeat % beatsPerBar) + 1;
+
+  // Calculate cumulative beat positions for each section
+  const sectionBeatPositions = useMemo(() => {
+    let cumulativeBeat = 0;
+    return sections.map(section => {
+      const sectionStartBeat = cumulativeBeat;
+      const sectionBeats = section.progression.reduce((sum, chord) => sum + chord.duration, 0) * (section.repeats || 1);
+      cumulativeBeat += sectionBeats;
+      return {
+        startBeat: sectionStartBeat,
+        endBeat: cumulativeBeat,
+        totalBeats: sectionBeats,
+      };
+    });
+  }, [sections]);
+
+  // Calculate total beats in progression for looping
+  const totalBeats = useMemo(() => 
+    sectionBeatPositions.length > 0 
+      ? sectionBeatPositions[sectionBeatPositions.length - 1].endBeat 
+      : 0,
+    [sectionBeatPositions]
+  );
+
+  // Calculate which beat within each section is active (handles looping)
+  const getActiveBeatInSection = useCallback((sectionIndex: number) => {
+    if (totalBeats === 0) return -1;
+    
+    const loopedBeat = currentBeat % totalBeats;
+    const position = sectionBeatPositions[sectionIndex];
+    
+    if (loopedBeat >= position.startBeat && loopedBeat < position.endBeat) {
+      return Math.floor(loopedBeat - position.startBeat);
+    }
+    return -1;
+  }, [currentBeat, totalBeats, sectionBeatPositions]);
 
   // Handle drag-and-drop reordering
   const handleDragEnd = useCallback((result: DropResult) => {
@@ -223,45 +261,53 @@ export function LoopTimeline() {
                                 {...provided.draggableProps}
                                 className={`section-card chord-quality-maj ${snapshot.isDragging ? 'dragging' : ''}`}
                               >
-                                <div className="drag-handle" {...provided.dragHandleProps} />
-                                
-                                <span className="section-name">{section.name}</span>
-                                
+                                {/* Beat indicators at top edge */}
                                 <div className="duration-indicator">
-                                  {Array.from({ length: 4 }).map((_, i) => (
-                                    <div 
-                                      key={i}
-                                      className={`duration-beat ${i < 3 ? 'active' : ''}`}
-                                    />
-                                  ))}
-                                </div>
-                                
-                                <div className="section-meta">
-                                  <div className="section-meta-item">
-                                    <span className="repeat-badge">×{section.repeats || 1}</span>
-                                  </div>
-                                  <div className="section-meta-item">
-                                    <span>{Math.ceil((section.progression.reduce((s, c) => s + c.duration, 0) * (section.repeats || 1)) / (section.beatsPerBar || 4))} bars</span>
-                                  </div>
-                                  <div className="section-meta-item">
-                                    <span>{section.progression.length} chords</span>
-                                  </div>
+                                  {(() => {
+                                    const sectionBeats = Math.ceil(section.progression.reduce((s, c) => s + c.duration, 0));
+                                    const activeBeat = getActiveBeatInSection(index);
+                                    return Array.from({ length: sectionBeats }).map((_, i) => (
+                                      <div 
+                                        key={i}
+                                        className={`duration-beat ${i === activeBeat ? 'active' : ''}`}
+                                      />
+                                    ));
+                                  })()}
                                 </div>
 
-                                {/* Expanded detail (only shown in expanded/fullscreen modes) */}
-                                <div className="section-detail-expanded">
-                                  <div style={{ marginBottom: '6px' }}>
-                                    <strong>Progression:</strong>
+                                {/* Card content with padding */}
+                                <div className="section-card-content">
+                                  <div className="drag-handle" {...provided.dragHandleProps} />
+                                  
+                                  <span className="section-name">{section.name}</span>
+                                  
+                                  <div className="section-meta">
+                                    <div className="section-meta-item">
+                                      <span className="repeat-badge">×{section.repeats || 1}</span>
+                                    </div>
+                                    <div className="section-meta-item">
+                                      <span>{Math.ceil((section.progression.reduce((s, c) => s + c.duration, 0) * (section.repeats || 1)) / (section.beatsPerBar || 4))} bars</span>
+                                    </div>
+                                    <div className="section-meta-item">
+                                      <span>{section.progression.length} chords</span>
+                                    </div>
                                   </div>
-                                  <div className="chord-list-compact">
-                                    {section.progression.map((chord, chordIdx) => (
-                                      <div key={chordIdx} className="chord-chip">
-                                        {chord.metadata?.quality || '?'}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div style={{ marginTop: '8px', fontSize: '10px', opacity: 0.7 }}>
-                                    {section.progression.reduce((s, c) => s + c.duration, 0)} beats total
+
+                                  {/* Expanded detail (only shown in expanded/fullscreen modes) */}
+                                  <div className="section-detail-expanded">
+                                    <div style={{ marginBottom: '6px' }}>
+                                      <strong>Progression:</strong>
+                                    </div>
+                                    <div className="chord-list-compact">
+                                      {section.progression.map((chord, chordIdx) => (
+                                        <div key={chordIdx} className="chord-chip">
+                                          {chord.metadata?.quality || '?'}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{ marginTop: '8px', fontSize: '10px', opacity: 0.7 }}>
+                                      {section.progression.reduce((s, c) => s + c.duration, 0)} beats total
+                                    </div>
                                   </div>
                                 </div>
                               </div>

@@ -251,7 +251,7 @@
 .section-card {
   position: relative;
   min-width: 140px;
-  padding: 12px 16px;
+  padding: 0;
   
   /* Transparent card with subtle texture */
   background: rgba(0, 0, 0, 0.05);
@@ -259,6 +259,7 @@
   
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 6px;
+  overflow: hidden;
   
   /* Card lift shadow - floats above cylinder surface */
   box-shadow: 
@@ -271,6 +272,11 @@
   scroll-snap-align: start;
   
   transition: all var(--timeline-transition-smooth);
+}
+
+/* Section card content wrapper - adds padding back */
+.section-card-content {
+  padding: 12px 16px;
 }
 
 /* Hover state - card lifts higher */
@@ -493,33 +499,27 @@
 
 .duration-indicator {
   display: flex;
-  gap: 2px;
-  height: 20px;
-  margin-bottom: 8px;
-  border-radius: 2px;
+  gap: 0;
+  height: 6px;
+  width: 100%;
+  border-radius: 0;
   overflow: hidden;
 }
 
 .duration-beat {
   flex: 1;
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 0;
   
-  box-shadow: 
-    inset 0 1px 2px rgba(0, 0, 0, 0.15),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
   
-  opacity: 0.6;
-  transition: all 0.15s ease;
+  opacity: 1;
+  transition: all 0.1s ease;
 }
 
 .duration-beat.active {
-  background: rgba(0, 0, 0, 0.25);
-  
-  box-shadow: 
-    inset 0 1px 2px rgba(0, 0, 0, 0.3),
-    inset 0 -1px 1px rgba(0, 0, 0, 0.2);
-  
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
   opacity: 1;
 }
 
