@@ -1,0 +1,53 @@
+/* 1. Define the Variables */
+:root {
+  --background: #f7f9f3;
+  --foreground: #000000;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --border: #000000;
+  --muted-foreground: #666666;
+  --chart-4: #f97316; /* Default pink-to-orange base */
+}
+
+/* 2. Dark Mode Overrides */
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;      /* Brighter white text */
+  --card: #000000;
+  --popover: #1a1a1a;        /* Dark grey for panels */
+  --border: #654321; /* Brown borders */
+  --muted-foreground: #d1d5db; /* Lighter secondary text */
+  --chart-4: #ff8c00;         /* Saffron */
+}
+
+/* 3. Apply to Layout (Fixes the "White Background" issue) */
+body.dark {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+/* Ensures containers and panels respect the dark theme */
+.dark #root,
+.dark .bg-app,
+.dark .panel {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+.dark .panel {
+  background-color: var(--popover) !important;
+  border-color: var(--border) !important;
+}
+
+/* 4. Secondary Text Visibility Fix */
+.dark .opacity-75 {
+  opacity: 0.9 !important;      /* Bumped from 0.75 for readability */
+  color: var(--muted-foreground) !important;
+}
+
+/* 5. Slot 3 Button Specificity (Pink to Orange) */
+.dark .quality-dom,
+.dark .bg-chart-4 {
+  background-color: var(--chart-4) !important;
+  color: #ffffff !important;
+}

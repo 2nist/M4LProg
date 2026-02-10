@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-electron/
+build/
+release-builds/
+*.dmg
+*.exe
+*.zip
+*.AppImage
+
+# Electron
+out/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+
+# Env files
+.env
+.env.local
+
+# Max/MSP temp files
+*.mxo~
+*.maxpat~
+
+# TypeScript
+*.tsbuildinfo

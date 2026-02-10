@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- CSP is handled by Electron main process for better security -->
+    <title>ChordGen Pro</title>
+    <style>
+      /* Inline dark-theme variables to ensure immediate dark rendering before CSS loads */
+      body.dark {
+        --background: #000000;
+        --foreground: #fff9e5;
+        --card: #000000;
+        --card-foreground: #fff9e5;
+        --popover: #000000;
+        --popover-foreground: #fff9e5;
+        --primary: #17d0d3;
+        --primary-foreground: #000000;
+        --muted: #1f1f1f;
+        --muted-foreground: #cccccc;
+        --border: #363636;
+        --input: #fff9e5;
+        --ring: #17d0d3;
+        --sidebar: #000000;
+        --sidebar-foreground: #fff9e5;
+      }
+      /* Also apply to html if JS adds class there */
+      html.dark { background-color: var(--background); }
+    </style>
+  </head>
+  <body class="dark compact" style="overflow: unset; --background: #000000; --foreground: #fff9e5; --card: #000000; --card-foreground: #fff9e5; --popover: #000000; --popover-foreground: #fff9e5; background-color: #000000; color: #fff9e5;">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

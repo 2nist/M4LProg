@@ -1,0 +1,29 @@
+{
+  "github.copilot.enable": {
+    "*": true,
+    "yaml": true,
+    "plaintext": false,
+    "markdown": false
+  },
+  "search.exclude": {
+    "docs/reference/**": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/dist-electron": true
+  },
+  "files.exclude": {
+    "patchers": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/dist-electron/**": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "amplicode.server.tsConfig": "./tsconfig.node.json"
+}

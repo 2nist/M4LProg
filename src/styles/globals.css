@@ -1,0 +1,874 @@
+@import "tailwindcss";
+
+/* Theme variables are provided by `src/styles/index.css`.
+   Avoid redefining the core --background / --foreground variables here
+   so the user's theme file can control the palette. globals.css still
+   contains utility mappings and overrides that reference those variables. */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  --tracking-tighter: calc(var(--tracking-normal) - 0.05em);
+  --tracking-tight: calc(var(--tracking-normal) - 0.025em);
+  --tracking-normal: var(--tracking-normal);
+  --tracking-wide: calc(var(--tracking-normal) + 0.025em);
+  --tracking-wider: calc(var(--tracking-normal) + 0.05em);
+  --tracking-widest: calc(var(--tracking-normal) + 0.1em);
+}
+
+body {
+  letter-spacing: var(--tracking-normal);
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* Nuclear fallback: paint a dark layer behind everything so even rogue
+   light backgrounds sit on black. The fixed pseudo-element ignores layout
+   and sits at the viewport base. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Hard enforcement for dark mode: if .dark is present on html or body,
+   lock the palette and surface colors with !important so late-loading light
+   styles cannot override them. */
+html.dark,
+body.dark {
+  --background: #000000 !important;
+  --foreground: #ffffff !important;
+  --card: #000000 !important;
+  --card-foreground: #ffffff !important;
+  --popover: #1a1a1a !important; /* Darker panel background */
+  --popover-foreground: #ffffff !important;
+  --primary: #2dd4bf !important; /* Bright turquoise */
+  --primary-foreground: #000000 !important;
+  --secondary: #ff8c00 !important; /* Saffron orange */
+  --secondary-foreground: #000000 !important;
+  --muted: #2a2a2a !important; /* Darker muted background */
+  --muted-foreground: #d4d4d4 !important; /* Lighter muted text */
+  --accent: #8b4513 !important; /* Rich brown */
+  --accent-foreground: #ffffff !important;
+  --destructive: #dc2626 !important; /* Red for destructive actions */
+  --destructive-foreground: #ffffff !important;
+  --border: #654321 !important; /* Brown borders */
+  --input: #1a1a1a !important; /* Dark input background */
+  --ring: #2dd4bf !important; /* Turquoise focus ring */
+  --chart-1: #2dd4bf !important; /* Turquoise */
+  --chart-2: #2dd4bf !important; /* Turquoise */
+  --chart-3: #ff8c00 !important; /* Saffron */
+  --chart-4: #ff8c00 !important; /* Saffron */
+  --chart-5: #8b4513 !important; /* Brown */
+  --sidebar: #1a1a1a !important;
+  --sidebar-foreground: #ffffff !important;
+  --sidebar-primary: #2dd4bf !important;
+  --sidebar-primary-foreground: #000000 !important;
+  --sidebar-accent: #ff8c00 !important;
+  --sidebar-accent-foreground: #000000 !important;
+  --sidebar-border: #654321 !important;
+  --sidebar-ring: #2dd4bf !important;
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* High-specificity theme enforcement: ensure the CSS variables drive the app
+   backgrounds and foregrounds even if Tailwind or other styles try to set
+   explicit whites. This uses !important intentionally to guarantee theme
+   consistency across Electron/iframe contexts. */
+html, body, #root, .h-screen, .bg-app {
+  background-color: var(--color-background) !important;
+  color: var(--color-foreground) !important;
+}
+
+/* Semantic outline / border colors (light + dark map to --color-border) */
+:root,
+.dark {
+  --outline-1: color-mix(in srgb, var(--color-border) 12%, transparent);
+  --outline-2: color-mix(in srgb, var(--color-border) 24%, transparent);
+  --outline-3: color-mix(in srgb, var(--color-border) 40%, transparent);
+}
+
+/* Grey-outline helpers to give subtle separation without harsh white/black lines */
+.outline-1 {
+  box-shadow: 0 0 0 1px var(--outline-1) inset;
+}
+.outline-2 {
+  box-shadow: 0 0 0 1px var(--outline-2) inset;
+}
+.outline-3 {
+  box-shadow: 0 0 0 1px var(--outline-3) inset;
+}
+
+/* Map common Tailwind border utilities to semantic outline color */
+.border,
+.border-2,
+.border-t,
+.border-r,
+.border-b,
+.border-l,
+.border-gray-500,
+.border-gray-600,
+.border-gray-700,
+.border-gray-800 {
+  border-color: var(--color-border) !important;
+}
+
+/* Subtle focus/ ring overrides that should use the ring color but fall back to outline shades */
+.ring,
+.ring-2,
+.ring-4 {
+  --tw-ring-color: var(--color-ring) !important;
+}
+.ring-default {
+  box-shadow:
+    0 0 0 1px var(--outline-2),
+    0 0 0 4px color-mix(in srgb, var(--color-ring) 12%, transparent);
+}
+
+/* Ensure background uses semantic color variable */
+.bg-app {
+  background-color: var(--color-background) !important;
+}
+/* Compact control helpers */
+.control,
+button,
+input,
+select,
+textarea {
+  font-size: var(--control-font-size);
+}
+
+.control--compact,
+button.compact,
+input.compact,
+select.compact,
+textarea.compact {
+  padding: var(--control-padding-compact);
+  font-size: var(--control-font-size-compact);
+  border-radius: var(--compact-radius);
+}
+
+.control--dense {
+  display: inline-flex;
+  gap: var(--control-gap);
+  align-items: center;
+}
+
+.strip-controls {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.card,
+.panel {
+  padding: 0.35rem;
+  border-radius: var(--compact-radius);
+  box-shadow: var(--compact-shadow);
+}
+
+/* Utility: reduce global gaps for denser layouts */
+.dense {
+  --spacing: var(--spacing-compact);
+}
+
+/* Inputs & selects default compact appearance */
+input,
+select,
+textarea {
+  padding: var(--control-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* When applying the compact class globally, controls shrink */
+body.compact input,
+body.compact select,
+body.compact textarea,
+body.compact button {
+  padding: var(--control-padding-compact);
+  font-size: var(--control-font-size-compact);
+  border-radius: var(--compact-radius);
+}
+
+/* Broad fallback: ensure visible subtle outlines on major interactive elements */
+button,
+.btn,
+input,
+select,
+textarea,
+.card,
+.panel,
+.control,
+.chip,
+.badge {
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-border) 12%, transparent) inset,
+    0 2px 4px rgba(0, 0, 0, 0.3) !important; /* Black shadow */
+}
+
+/* If color-mix isn't supported, ensure a plain border fallback */
+@supports not (
+  color: color-mix(in srgb, var(--color-border) 12%, transparent)
+) {
+  button,
+  .btn,
+  input,
+  select,
+  textarea,
+  .card,
+  .panel,
+  .control,
+  .chip,
+  .badge {
+    border-color: var(--color-border) !important;
+  }
+}
+
+/* Small helpers for editor visuals */
+.panel-muted {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.muted-text {
+  color: var(--color-muted-foreground);
+}
+
+/* Compact control helpers */
+.control,
+button,
+input,
+select,
+textarea {
+  font-size: var(--control-font-size);
+}
+
+.control--compact,
+button.compact,
+input.compact,
+select.compact,
+textarea.compact {
+  padding: var(--control-padding-compact);
+  font-size: var(--control-font-size-compact);
+  border-radius: var(--compact-radius);
+}
+
+.control--dense {
+  display: inline-flex;
+  gap: var(--control-gap);
+  align-items: center;
+}
+
+.strip-controls {
+  display: flex;
+  gap: 0.375rem;
+  align-items: center;
+}
+
+.card,
+.panel {
+  padding: 0.35rem;
+  border-radius: var(--compact-radius);
+  box-shadow: var(--compact-shadow);
+}
+
+/* Utility: reduce global gaps for denser layouts */
+.dense {
+  --spacing: var(--spacing-compact);
+}
+
+/* Inputs & selects default compact appearance */
+input,
+select,
+textarea {
+  padding: var(--control-padding);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* When applying the compact class globally, controls shrink */
+body.compact input,
+body.compact select,
+body.compact textarea,
+body.compact button {
+  padding: var(--control-padding-compact);
+  font-size: var(--control-font-size-compact);
+  border-radius: var(--compact-radius);
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Custom scrollbar styles */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background-color: #d2b48c; /* Tan background */
+  border: 1px solid #654321; /* Brown border */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #c0c0c0; /* Silver slider handle */
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* Black shadow */
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: #a8a8a8; /* Darker silver on hover */
+}
+
+/* Firefox scrollbar styling */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #c0c0c0 #d2b48c; /* Silver thumb, tan track */
+}
+
+/* Force utility classes to follow our theme variables in all modes
+   (override Tailwind's generated color tokens when necessary). */
+.bg-gray-950,
+.bg-gray-900 {
+  background-color: var(--background) !important;
+}
+.bg-gray-800 {
+  background-color: var(--sidebar) !important;
+}
+.bg-gray-700,
+.bg-gray-700\/50 {
+  background-color: var(--popover) !important;
+}
+.text-gray-900,
+.text-gray-950 {
+  color: var(--foreground) !important;
+}
+
+/* Additional text color overrides for dark mode */
+.dark .text-gray-100,
+.dark .text-gray-200,
+.dark .text-gray-300,
+.dark .text-gray-400,
+.dark .text-gray-500,
+.dark .text-gray-600,
+.dark .text-gray-700,
+.dark .text-gray-800 {
+  color: var(--muted-foreground) !important;
+}
+
+/* Ensure buttons and interactive elements have proper contrast */
+.dark button,
+.dark .btn,
+.dark input,
+.dark select,
+.dark textarea {
+  color: var(--foreground) !important;
+  background-color: var(--popover) !important;
+}
+
+/* Accent mappings */
+.bg-blue-600,
+.bg-blue-500 {
+  background-color: var(--primary) !important;
+}
+.bg-green-600,
+.bg-green-500 {
+  background-color: var(--chart-2) !important;
+}
+.bg-red-600,
+.bg-red-500 {
+  background-color: var(--accent) !important;
+}
+.bg-yellow-600,
+.bg-yellow-500 {
+  background-color: var(--chart-3) !important;
+}
+.bg-purple-600,
+.bg-purple-500 {
+  background-color: var(--chart-4) !important;
+}
+
+/* Borders and rings */
+.border-gray-800 {
+  border-color: var(--sidebar) !important;
+}
+.border-gray-700 {
+  border-color: var(--popover) !important;
+}
+.ring-blue-800,
+.ring-blue-400\/50 {
+  --tw-ring-color: var(--primary) !important;
+}
+
+/* Semantic borders/outlines for cards, controls and buttons */
+.card,
+.panel {
+  border: 2px solid #654321; /* Brown border */
+  box-shadow:
+    0 0 0 1px var(--outline-1) inset,
+    0 4px 8px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
+
+button,
+.btn,
+.control,
+input,
+select,
+textarea {
+  border: 2px solid #654321 !important; /* Brown border */
+  color: var(--color-foreground);
+  background-color: transparent;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important; /* Black shadow */
+}
+
+/* Prefer semantic popover/card backgrounds over raw gray utilities */
+.bg-gray-600,
+.bg-gray-500 {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+}
+
+/* When components use gray-700/800 ensure they map to popover/sidebar */
+.bg-gray-700,
+.bg-gray-800 {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+}
+
+/* Broad selector: any element that uses a Tailwind background utility should
+   get a subtle outline so it won't visually blend into the page background. */
+[class*="bg-"] {
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-border) 12%, transparent) inset,
+    0 2px 4px rgba(0, 0, 0, 0.3) !important; /* Black shadow */
+}
+
+/* Semantic component color helpers (map to theme tokens) */
+.status-on {
+  background-color: #2dd4bf !important; /* Turquoise */
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important; /* Black shadow */
+}
+.status-off {
+  background-color: #8b4513 !important; /* Brown */
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important; /* Black shadow */
+}
+.status-on-text {
+  color: #2dd4bf !important; /* Turquoise text */
+}
+
+.btn-primary {
+  background-color: #2dd4bf !important; /* Turquoise */
+  color: #000000 !important;
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important; /* Black shadow */
+}
+.btn-primary:hover {
+  background-color: #25b5a8 !important; /* Slightly darker turquoise */
+  box-shadow:
+    0 0 8px rgba(45, 212, 191, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.5) !important; /* Turquoise glow + enhanced black shadow */
+}
+.btn-disabled {
+  background-color: #2a2a2a !important; /* Dark muted background */
+  color: #666666 !important; /* Muted text */
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important; /* Subtle black shadow */
+  cursor: not-allowed;
+}
+
+.btn-small {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
+}
+.btn-danger {
+  background-color: #8b4513; /* Brown */
+  color: #ffffff;
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+.input {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
+}
+.input.small {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.8rem;
+}
+.input:focus {
+  outline: none;
+  border-color: #2dd4bf; /* Turquoise border on focus */
+  box-shadow:
+    0 0 0 3px rgba(45, 212, 191, 0.2),
+    0 4px 8px rgba(0, 0, 0, 0.4); /* Turquoise glow + enhanced black shadow */
+}
+
+.index-badge {
+  background: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+.pattern-badge {
+  background: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+/* Dark mode override for pattern-badge (Ready button) */
+.dark .pattern-badge {
+  background: #1a1a1a !important; /* Dark panel background */
+  color: #d4d4d4 !important; /* Light muted text */
+  border: 2px solid #654321 !important; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important; /* Black shadow */
+}
+
+.chord-label {
+  letter-spacing: -0.01em;
+}
+
+/* Chord semantic colors */
+.chord-bg-default {
+  background-color: #1a1a1a; /* Dark panel background */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(101, 67, 33, 0.3)); /* Brown glow from bottom */
+}
+.chord-text-default {
+  color: #d4d4d4; /* Light muted text */
+}
+.chord-ring-default {
+  --tw-ring-color: #654321; /* Brown ring */
+}
+
+.chord-bg-maj {
+  background-color: #ff8c00; /* Saffron */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(255, 140, 0, 0.5)); /* Saffron glow from bottom */
+}
+.chord-text-maj {
+  color: #000000; /* Black text on saffron */
+}
+.chord-ring-maj {
+  --tw-ring-color: #ff8c00; /* Saffron ring */
+}
+
+.chord-bg-min {
+  background-color: #2dd4bf; /* Turquoise */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(45, 212, 191, 0.5)); /* Turquoise glow from bottom */
+}
+.chord-text-min {
+  color: #000000; /* Black text on turquoise */
+}
+.chord-ring-min {
+  --tw-ring-color: #2dd4bf; /* Turquoise ring */
+}
+
+.chord-bg-dim {
+  background-color: #d8b4fe; /* Lavender */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(216, 180, 254, 0.5)); /* Lavender glow from bottom */
+}
+.chord-text-dim {
+  color: #000000; /* Black text on lavender */
+}
+.chord-ring-dim {
+  --tw-ring-color: #d8b4fe; /* Lavender ring */
+}
+
+.chord-bg-aug {
+  background-color: #ef4444; /* Red */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(239, 68, 68, 0.5)); /* Red glow from bottom */
+}
+.chord-text-aug {
+  color: #ffffff; /* White text on red */
+}
+.chord-ring-aug {
+  --tw-ring-color: #ef4444; /* Red ring */
+}
+
+.chord-bg-dom {
+  background-color: #ef4444; /* Red */
+  border: 2px solid #654321; /* Brown border */
+  filter: drop-shadow(0 8px 12px rgba(239, 68, 68, 0.5)); /* Red glow from bottom */
+}
+.chord-text-dom {
+  color: #ffffff !important; /* White text on red */
+}
+.chord-ring-dom {
+  --tw-ring-color: #ef4444; /* Red ring */
+}
+
+.slot-border {
+  border-color: #654321; /* Brown border */
+}
+.slot-selected {
+  border: 2px solid #2dd4bf !important; /* Turquoise border when selected */
+  outline: 1px solid #2dd4bf !important;
+  outline-offset: 1px;
+}
+.slot-in-pattern {
+  box-shadow:
+    0 0 0 2px rgba(255, 140, 0, 0.3),
+    0 2px 6px rgba(0, 0, 0, 0.4); /* Saffron glow + black shadow */
+}
+
+/* White glow for duration pads that are lit */
+.duration-lit {
+  outline: 1px solid #ffffff !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Note / quality buttons */
+.note-selected {
+  background-color: #2dd4bf; /* Turquoise */
+  color: #000000; /* Black text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow:
+    0 0 0 3px rgba(45, 212, 191, 0.4),
+    0 2px 6px rgba(0, 0, 0, 0.4); /* Turquoise glow + black shadow */
+}
+.note-black {
+  background-color: #8b4513; /* Brown */
+  color: #ffffff; /* White text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.note-default {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
+}
+
+.quality-maj {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #ff8c00 !important; /* Saffron text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.quality-maj span {
+  color: #ff8c00 !important;
+}
+.quality-min {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #2dd4bf !important; /* Turquoise text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.quality-min span {
+  color: #2dd4bf !important;
+}
+.quality-dom {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #ef4444 !important; /* Red text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.quality-dom span {
+  color: #ef4444 !important;
+}
+.quality-dim {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d8b4fe !important; /* Lavender text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.quality-dim span {
+  color: #d8b4fe !important;
+}
+.quality-aug {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #ef4444 !important; /* Red text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+.quality-aug span {
+  color: #ef4444 !important;
+}
+.quality-selected {
+  border: 2px solid #2dd4bf !important; /* Turquoise border when selected */
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.8) !important; /* Thin glowing border */
+}
+
+.quality-default {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
+}
+
+.panel {
+  background-color: #1a1a1a; /* Dark panel background */
+  color: #d4d4d4; /* Light muted text */
+  border: 2px solid #654321; /* Brown border */
+  box-shadow:
+    0 0 8px rgba(139, 69, 19, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.5); /* Brown glow + enhanced black shadow */
+}
+.panel-title {
+  color: #d4d4d4; /* Light muted text */
+}
+
+/* Modal/backdrop helpers */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 0.25rem;
+  transition: background-color 0.12s ease;
+}
+.btn-icon:hover {
+  background-color: color-mix(in srgb, var(--color-border) 8%, transparent);
+}
+
+/* Range slider (encoder) styling - Turquoise theme */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track styling - show turquoise progress with brown unfilled */
+input[type="range"]::-webkit-slider-track {
+  background: linear-gradient(to right, #2dd4bf 0%, #2dd4bf var(--progress-percent, 50%), #654321 var(--progress-percent, 50%), #654321 100%);
+  height: 4px;
+  border-radius: 2px;
+  border: 1px solid #654321; /* Brown border */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+input[type="range"]::-moz-range-track {
+  background: linear-gradient(to right, #2dd4bf 0%, #2dd4bf var(--progress-percent, 50%), #654321 var(--progress-percent, 50%), #654321 100%);
+  height: 4px;
+  border-radius: 2px;
+  border: 1px solid #654321; /* Brown border */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4); /* Black shadow */
+}
+
+/* Thumb styling - turquoise with brown border */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #2dd4bf; /* Turquoise thumb */
+  border: 2px solid #654321; /* Brown border */
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(45, 212, 191, 0.6); /* Turquoise glow */
+  position: relative;
+  z-index: 1;
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #2dd4bf; /* Turquoise thumb */
+  border: 2px solid #654321; /* Brown border */
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(45, 212, 191, 0.6); /* Turquoise glow */
+}
+
+/* Focus styling */
+input[type="range"]:focus {
+  outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.4), 0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
+}
+
+input[type="range"]:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.4), 0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
+}
