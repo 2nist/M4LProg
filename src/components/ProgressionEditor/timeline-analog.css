@@ -149,7 +149,7 @@
 .timeline-scroll-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
   padding: 16px 24px;
   min-width: min-content;
   
@@ -250,14 +250,14 @@
 
 .section-card {
   position: relative;
-  min-width: 140px;
+  min-width: 200px;
   padding: 0;
   
-  /* Transparent card with subtle texture */
-  background: rgba(0, 0, 0, 0.05);
+  /* Light card background for better readability */
+  background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(2px);
   
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 6px;
   overflow: hidden;
   
@@ -276,14 +276,14 @@
 
 /* Section card content wrapper - adds padding back */
 .section-card-content {
-  padding: 12px 16px;
+  padding: 8px 10px;
 }
 
 /* Hover state - card lifts higher */
 .section-card:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.75);
   
-  border-color: rgba(0, 0, 0, 0.25);
+  border-color: rgba(0, 0, 0, 0.3);
   
   box-shadow: 
     0 6px 16px rgba(0, 0, 0, 0.25),
@@ -295,7 +295,7 @@
 
 /* Selected state - warm spotlight */
 .section-card.selected {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.85);
   border-color: rgba(0, 0, 0, 0.4);
   
   box-shadow: 
@@ -500,15 +500,17 @@
 .duration-indicator {
   display: flex;
   gap: 0;
-  height: 6px;
+  height: 8px;
   width: 100%;
   border-radius: 0;
   overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .duration-beat {
   flex: 1;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 0;
   
   box-shadow: none;
@@ -517,9 +519,13 @@
   transition: all 0.1s ease;
 }
 
+.duration-beat:last-child {
+  border-right: none;
+}
+
 .duration-beat.active {
-  background: rgba(0, 0, 0, 0.4);
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
   opacity: 1;
 }
 
