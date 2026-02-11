@@ -133,7 +133,11 @@ body.dark {
    backgrounds and foregrounds even if Tailwind or other styles try to set
    explicit whites. This uses !important intentionally to guarantee theme
    consistency across Electron/iframe contexts. */
-html, body, #root, .h-screen, .bg-app {
+html,
+body,
+#root,
+.h-screen,
+.bg-app {
   background-color: var(--color-background) !important;
   color: var(--color-foreground) !important;
 }
@@ -537,6 +541,18 @@ textarea {
     0 0 8px rgba(45, 212, 191, 0.4),
     0 4px 8px rgba(0, 0, 0, 0.5) !important; /* Turquoise glow + enhanced black shadow */
 }
+
+.btn-yellow {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+  color: #000000 !important;
+  border: 2px solid #fcd34d !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.btn-yellow:hover:not(:disabled) {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%) !important;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
 .btn-disabled {
   background-color: #2a2a2a !important; /* Dark muted background */
   color: #666666 !important; /* Muted text */
@@ -546,12 +562,16 @@ textarea {
 }
 
 .btn-small {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #d4d4d4; /* Light muted text */
-  border: 2px solid #654321; /* Brown border */
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); /* Yellow gradient */
+  color: #000000; /* Black text */
+  border: 2px solid #fcd34d; /* Yellow border */
   border-radius: 6px;
   padding: 0.25rem 0.5rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3), 0 2px 4px rgba(0, 0, 0, 0.3); /* Yellow glow */
+}
+.btn-small:hover {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%); /* Lighter yellow on hover */
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 .btn-danger {
   background-color: #8b4513; /* Brown */
@@ -613,7 +633,9 @@ textarea {
 .chord-bg-default {
   background-color: #1a1a1a; /* Dark panel background */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(101, 67, 33, 0.3)); /* Brown glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(101, 67, 33, 0.3)
+  ); /* Brown glow from bottom */
 }
 .chord-text-default {
   color: #d4d4d4; /* Light muted text */
@@ -625,7 +647,9 @@ textarea {
 .chord-bg-maj {
   background-color: #ff8c00; /* Saffron */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(255, 140, 0, 0.5)); /* Saffron glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(255, 140, 0, 0.5)
+  ); /* Saffron glow from bottom */
 }
 .chord-text-maj {
   color: #000000; /* Black text on saffron */
@@ -637,7 +661,9 @@ textarea {
 .chord-bg-min {
   background-color: #2dd4bf; /* Turquoise */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(45, 212, 191, 0.5)); /* Turquoise glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(45, 212, 191, 0.5)
+  ); /* Turquoise glow from bottom */
 }
 .chord-text-min {
   color: #000000; /* Black text on turquoise */
@@ -649,7 +675,9 @@ textarea {
 .chord-bg-dim {
   background-color: #d8b4fe; /* Lavender */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(216, 180, 254, 0.5)); /* Lavender glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(216, 180, 254, 0.5)
+  ); /* Lavender glow from bottom */
 }
 .chord-text-dim {
   color: #000000; /* Black text on lavender */
@@ -661,7 +689,9 @@ textarea {
 .chord-bg-aug {
   background-color: #ef4444; /* Red */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(239, 68, 68, 0.5)); /* Red glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(239, 68, 68, 0.5)
+  ); /* Red glow from bottom */
 }
 .chord-text-aug {
   color: #ffffff; /* White text on red */
@@ -673,7 +703,9 @@ textarea {
 .chord-bg-dom {
   background-color: #ef4444; /* Red */
   border: 2px solid #654321; /* Brown border */
-  filter: drop-shadow(0 8px 12px rgba(239, 68, 68, 0.5)); /* Red glow from bottom */
+  filter: drop-shadow(
+    0 8px 12px rgba(239, 68, 68, 0.5)
+  ); /* Red glow from bottom */
 }
 .chord-text-dom {
   color: #ffffff !important; /* White text on red */
@@ -725,50 +757,103 @@ textarea {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Black shadow */
 }
 
+/* Major - Orange (theme color) */
 .quality-maj {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #ff8c00 !important; /* Saffron text */
-  border: 2px solid #654321; /* Brown border */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background: linear-gradient(135deg, #ff8c00 0%, #ff7700 100%) !important;
+  color: #000000 !important;
+  border: 2px solid #ff9500 !important;
+  box-shadow: 0 0 12px rgba(255, 140, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 .quality-maj span {
-  color: #ff8c00 !important;
+  color: #000000 !important;
 }
+
+/* Minor - Turquoise (theme color) */
 .quality-min {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #2dd4bf !important; /* Turquoise text */
-  border: 2px solid #654321; /* Brown border */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%) !important;
+  color: #000000 !important;
+  border: 2px solid #2dd4bf !important;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 .quality-min span {
-  color: #2dd4bf !important;
+  color: #000000 !important;
 }
+
+/* Dominant - Yellow (theme color) */
 .quality-dom {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #ef4444 !important; /* Red text */
-  border: 2px solid #654321; /* Brown border */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+  color: #000000 !important;
+  border: 2px solid #fcd34d !important;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 .quality-dom span {
-  color: #ef4444 !important;
+  color: #000000 !important;
 }
+
+/* Diminished - Purple (outlier) */
 .quality-dim {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #d8b4fe !important; /* Lavender text */
-  border: 2px solid #654321; /* Brown border */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #c084fc !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 .quality-dim span {
-  color: #d8b4fe !important;
+  color: #ffffff !important;
 }
+
+/* Augmented - Pink (outlier) */
 .quality-aug {
-  background-color: #1a1a1a; /* Dark panel background */
-  color: #ef4444 !important; /* Red text */
-  border: 2px solid #654321; /* Brown border */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); /* Black shadow */
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #f472b6 !important;
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
 }
 .quality-aug span {
-  color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+/* Suspended - Red (outlier) */
+.quality-sus {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #f87171 !important;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.quality-sus span {
+  color: #ffffff !important;
+}
+
+/* Extended/Add - Green (outlier) */
+.quality-ext {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #34d399 !important;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.quality-ext span {
+  color: #ffffff !important;
+}
+
+/* Altered - Blue (outlier) */
+.quality-alt {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border: 2px solid #60a5fa !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.quality-alt span {
+  color: #ffffff !important;
+}
+
+/* Power/Special - Peach */
+.quality-power {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%) !important;
+  color: #000000 !important;
+  border: 2px solid #fdba74 !important;
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+.quality-power span {
+  color: #000000 !important;
 }
 .quality-selected {
   border: 2px solid #2dd4bf !important; /* Turquoise border when selected */
@@ -820,7 +905,13 @@ input[type="range"] {
 
 /* Track styling - show turquoise progress with brown unfilled */
 input[type="range"]::-webkit-slider-track {
-  background: linear-gradient(to right, #2dd4bf 0%, #2dd4bf var(--progress-percent, 50%), #654321 var(--progress-percent, 50%), #654321 100%);
+  background: linear-gradient(
+    to right,
+    #2dd4bf 0%,
+    #2dd4bf var(--progress-percent, 50%),
+    #654321 var(--progress-percent, 50%),
+    #654321 100%
+  );
   height: 4px;
   border-radius: 2px;
   border: 1px solid #654321; /* Brown border */
@@ -828,7 +919,13 @@ input[type="range"]::-webkit-slider-track {
 }
 
 input[type="range"]::-moz-range-track {
-  background: linear-gradient(to right, #2dd4bf 0%, #2dd4bf var(--progress-percent, 50%), #654321 var(--progress-percent, 50%), #654321 100%);
+  background: linear-gradient(
+    to right,
+    #2dd4bf 0%,
+    #2dd4bf var(--progress-percent, 50%),
+    #654321 var(--progress-percent, 50%),
+    #654321 100%
+  );
   height: 4px;
   border-radius: 2px;
   border: 1px solid #654321; /* Brown border */
@@ -866,9 +963,199 @@ input[type="range"]:focus {
 }
 
 input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.4), 0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
+  box-shadow:
+    0 0 0 4px rgba(45, 212, 191, 0.4),
+    0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
 }
 
 input[type="range"]:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 4px rgba(45, 212, 191, 0.4), 0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
+  box-shadow:
+    0 0 0 4px rgba(45, 212, 191, 0.4),
+    0 0 8px rgba(255, 140, 0, 0.3); /* Turquoise and saffron glow */
+}
+
+/* ============================================================================
+   Progression Editor Sliders
+   ============================================================================ */
+
+/* Progression zoom slider - matches timeline style */
+.progression-zoom-slider {
+  height: 3px;
+  width: 100px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin: 0 2px;
+}
+
+.progression-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.15s ease;
+}
+
+.progression-zoom-slider::-webkit-slider-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progression-zoom-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Parameter sliders (repeats, beats per bar) */
+.progression-param-slider {
+  height: 3px;
+  width: 80px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.progression-param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+}
+
+.progression-param-slider::-webkit-slider-thumb:hover {
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.progression-param-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Duration pad states */
+.duration-pad-off {
+  background-color: #1a1a1a !important;
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  border-color: #333333 !important;
+}
+
+.duration-pad-on {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Text accent colors for non-chord elements */
+.text-orange {
+  color: #ff8c00 !important;
+}
+
+.text-turquoise {
+  color: #2dd4bf !important;
+}
+
+.text-yellow {
+  color: #fbbf24 !important;
+}
+
+/* Progression editor — force compact black text for yellow/action buttons
+   Use a highly-specific selector and include dark-mode variant to override
+   other broad rules that make button text large/white. */
+.progression-editor .btn-yellow,
+.dark .progression-editor .btn-yellow,
+.progression-editor .btn-small,
+.dark .progression-editor .btn-small,
+.progression-editor button.btn-icon,
+.dark .progression-editor button.btn-icon,
+/* Target the actual component root used in the JSX */
+.progression-editor-content .btn-yellow,
+.dark .progression-editor-content .btn-yellow,
+.progression-editor-content .btn-small,
+.dark .progression-editor-content .btn-small,
+.progression-editor-content button.btn-icon,
+.dark .progression-editor-content button.btn-icon,
+.progression-editor-content button,
+.dark .progression-editor-content button,
+html.dark .progression-editor-content button {
+  color: #000000 !important;
+  font-size: 0.625rem !important; /* 10px */
+  padding: 0.15rem 0.4rem !important;
+  line-height: 1 !important;
+  text-transform: none !important;
+}
+
+.progression-editor-content .btn-small,
+.dark .progression-editor-content .btn-small,
+html.dark .progression-editor-content .btn-small {
+  font-size: 0.5rem !important; /* 8px */
+  padding: 0.125rem 0.3rem !important;
+}
+
+/* Make svg icons inside those buttons small and inherit the text color */
+.progression-editor-content .btn-yellow svg,
+.dark .progression-editor-content .btn-yellow svg,
+.progression-editor-content button.btn-icon svg,
+.dark .progression-editor-content button.btn-icon svg,
+html.dark .progression-editor-content button svg {
+  width: 12px !important;
+  height: 12px !important;
+  stroke: currentColor !important;
+  fill: none !important;
+}
+
+/* If the button has a label span, ensure it inherits and is tiny */
+.progression-editor-content .btn-yellow .btn-label,
+.dark .progression-editor-content .btn-yellow .btn-label,
+.progression-editor-content .btn-small .btn-label,
+.dark .progression-editor-content .btn-small .btn-label,
+html.dark .progression-editor-content .btn-label {
+  font-size: 0.5rem !important; /* 8px */
+  color: inherit !important;
+  margin-left: 0.25rem;
+}
+
+/* Beat pad context menu animation */
+.beat-pad-context-menu {
+  animation: fadeInScale 0.15s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

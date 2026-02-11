@@ -11,49 +11,49 @@
    ============================================================================ */
 
 :root {
-  /* Base Paper Materials */
-  --timeline-paper-base: hsl(45, 12%, 12%);
-  --timeline-paper-highlight: hsl(45, 15%, 18%);
-  --timeline-paper-shadow: hsl(45, 10%, 8%);
-  --timeline-paper-edge: hsl(45, 20%, 25%);
-  
+  /* Base Paper Materials - Old Paper/Parchment */
+  --timeline-paper-base: hsl(45, 25%, 75%);
+  --timeline-paper-highlight: hsl(45, 30%, 85%);
+  --timeline-paper-shadow: hsl(45, 20%, 60%);
+  --timeline-paper-edge: hsl(45, 25%, 50%);
+
   /* Warm Studio Light */
   --timeline-light-primary: hsl(30, 100%, 50%);
   --timeline-light-secondary: hsl(30, 80%, 45%);
   --timeline-light-ambient: hsl(30, 40%, 35%);
   --timeline-light-glow: hsl(30, 100%, 50%, 0.3);
-  
+
   /* Brushed Metal Accents */
   --timeline-metal-light: hsl(30, 25%, 60%);
   --timeline-metal-mid: hsl(30, 20%, 45%);
   --timeline-metal-dark: hsl(30, 15%, 35%);
-  
+
   /* Chord Quality Colors (Warm Muted Palette) */
   --timeline-quality-maj: hsl(45, 55%, 78%);
   --timeline-quality-maj-bg: hsl(45, 45%, 18%);
   --timeline-quality-maj-border: hsl(45, 50%, 25%);
-  
+
   --timeline-quality-min: hsl(210, 40%, 75%);
   --timeline-quality-min-bg: hsl(210, 25%, 16%);
   --timeline-quality-min-border: hsl(210, 30%, 22%);
-  
+
   --timeline-quality-dom: hsl(30, 50%, 75%);
   --timeline-quality-dom-bg: hsl(30, 40%, 18%);
   --timeline-quality-dom-border: hsl(30, 45%, 25%);
-  
+
   --timeline-quality-dim: hsl(0, 40%, 70%);
   --timeline-quality-dim-bg: hsl(0, 30%, 15%);
   --timeline-quality-dim-border: hsl(0, 35%, 20%);
-  
+
   --timeline-quality-aug: hsl(55, 45%, 75%);
   --timeline-quality-aug-bg: hsl(55, 35%, 17%);
   --timeline-quality-aug-border: hsl(55, 40%, 24%);
-  
+
   /* Buffer & Info Cards */
   --timeline-buffer-bg: hsl(40, 20%, 10%, 0.3);
   --timeline-buffer-border: hsl(40, 20%, 20%, 0.5);
   --timeline-buffer-text: hsl(40, 25%, 55%);
-  
+
   /* Transitions */
   --timeline-transition-smooth: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --timeline-transition-tape: 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -86,32 +86,58 @@
   position: relative;
   width: 100%;
   min-height: 120px;
-  
-  /* Layered background: texture + gradient */
+
+  /* Layered background: texture + cylindrical gradient + vertical vignette */
   background-image: 
+    /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
+    /* Vertical vignette (cylinder curves away from viewer at top and bottom) */
     linear-gradient(
-      to bottom,
-      var(--timeline-paper-highlight),
-      var(--timeline-paper-base),
-      var(--timeline-paper-shadow)
-    );
-  
+        180deg,
+        rgba(0, 0, 0, 0.2) 0%,
+        transparent 20%,
+        transparent 80%,
+        rgba(0, 0, 0, 0.2) 100%
+      ),
+    /* Left edge shadow (straight horizontal fall toward center, uniform top-to-bottom) */
+    linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.85) 1%,
+        rgba(0, 0, 0, 0.6) 5%,
+        rgba(0, 0, 0, 0.3) 15%,
+        rgba(0, 0, 0, 0.08) 30%,
+        transparent 45%
+      ),
+    /* Right edge shadow (straight horizontal fall toward center, uniform top-to-bottom) */
+    linear-gradient(
+        270deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.85) 1%,
+        rgba(0, 0, 0, 0.6) 5%,
+        rgba(0, 0, 0, 0.3) 15%,
+        rgba(0, 0, 0, 0.08) 30%,
+        transparent 45%
+      );
+
+  /* Uniform paper color (no horizontal variation - cylinder effect from edge shadows only) */
+  background-color: var(--timeline-paper-base);
+
   /* Cylinder edge definition */
   border-top: 1px solid var(--timeline-paper-edge);
   border-bottom: 1px solid var(--timeline-paper-shadow);
-  
-  /* Depth with inner shadows */
-  box-shadow: 
-    inset 0 1px 0 hsl(45, 20%, 20%),
-    inset 0 -1px 2px hsl(0, 0%, 0%, 0.4);
-  
-  /* Smooth scrolling with tape-like inertia */
+
+  /* Depth with inner shadows - pronounced top shadow for depth */
+  box-shadow:
+    inset 0 8px 16px rgba(0, 0, 0, 0.3),
+    inset 0 4px 8px rgba(0, 0, 0, 0.2),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+
+  /* Scrollable track — NO scroll-behavior:smooth or scroll-snap here.
+     Both fight programmatic scrollLeft assignments from auto-scroll. */
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-  
+
   /* Hide scrollbar for cleaner look */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -125,10 +151,11 @@
 .timeline-scroll-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 24px;
+  gap: 4px;
+  padding: 0 50%;
   min-width: min-content;
-  
+  height: 100%;
+
   transition: transform var(--timeline-transition-tape);
 }
 
@@ -141,11 +168,11 @@
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: 200;
   pointer-events: none;
-  
+
   /* Brushed metal gradient */
   background: linear-gradient(
     to right,
@@ -153,30 +180,30 @@
     var(--timeline-metal-light),
     var(--timeline-metal-dark)
   );
-  
-  /* Warm amber glow from reading light */
-  box-shadow: 
-    0 0 8px var(--timeline-light-glow),
-    0 0 20px hsl(30, 100%, 50%, 0.15),
-    inset 0 0 1px hsl(30, 50%, 80%);
-  
+
+  /* Warm amber glow from reading light - more pronounced */
+  box-shadow:
+    0 0 12px var(--timeline-light-glow),
+    0 0 24px hsl(30, 100%, 50%, 0.25),
+    inset 0 0 2px hsl(30, 50%, 90%);
+
   animation: playhead-pulse 2s ease-in-out infinite;
 }
 
 /* Playhead pointer at top */
 .playhead-dial::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-top: 8px solid var(--timeline-metal-mid);
-  
+
   filter: drop-shadow(0 2px 4px hsl(0, 0%, 0%, 0.4));
 }
 
@@ -186,34 +213,35 @@
   top: -36px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   padding: 6px 12px;
   background: var(--timeline-paper-shadow);
   border: 1px solid var(--timeline-paper-edge);
   border-radius: 4px;
-  
-  font-family: 'JetBrains Mono', monospace;
+
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   font-weight: 500;
-  color: hsl(30, 40%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   letter-spacing: 0.5px;
   white-space: nowrap;
-  
-  box-shadow: 
-    0 2px 8px hsl(0, 0%, 0%, 0.6),
-    inset 0 1px 0 hsl(30, 20%, 20%);
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* Playhead pulse animation */
 @keyframes playhead-pulse {
-  0%, 100% { 
-    box-shadow: 
+  0%,
+  100% {
+    box-shadow:
       0 0 8px hsl(30, 100%, 50%, 0.3),
       0 0 20px hsl(30, 100%, 50%, 0.15),
       inset 0 0 1px hsl(30, 50%, 80%);
   }
-  50% { 
-    box-shadow: 
+  50% {
+    box-shadow:
       0 0 12px hsl(30, 100%, 50%, 0.5),
       0 0 28px hsl(30, 100%, 50%, 0.25),
       inset 0 0 1px hsl(30, 50%, 80%);
@@ -226,93 +254,180 @@
 
 .section-card {
   position: relative;
-  min-width: 140px;
-  padding: 12px 16px;
-  
-  /* Warm paper texture + cylinder gradient */
-  background-image:
-    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Cfilter id="paper"%3E%3CfeTurbulence baseFrequency="1.2" numOctaves="3"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23paper)" opacity="0.04"/%3E%3C/svg%3E'),
-    linear-gradient(
-      to bottom,
-      hsl(45, 20%, 25%),
-      hsl(45, 15%, 18%),
-      hsl(45, 12%, 12%),
-      hsl(45, 10%, 8%)
-    );
-  
-  border: 1px solid hsl(45, 15%, 22%);
+  /* Width is set dynamically via inline styles based on beat count */
+  padding: 0;
+
+  /* Semi-transparent card background - allows gradient to show through */
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(3px);
+
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 6px;
-  
-  /* Studio light casting on cards */
-  box-shadow: 
-    0 2px 6px hsl(0, 0%, 0%, 0.4),
-    inset 0 1px 0 hsl(45, 25%, 20%),
-    inset 0 -1px 0 hsl(45, 10%, 8%);
-  
+  overflow: hidden;
+
+  /* Card lift shadow - floats above cylinder surface */
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
   cursor: pointer;
   user-select: none;
   scroll-snap-align: start;
-  
+
   transition: all var(--timeline-transition-smooth);
 }
 
-/* Hover state - light moves closer */
+/* Section card content wrapper - adds padding back */
+.section-card-content {
+  padding: 8px 10px;
+}
+
+/* Section header - name only in normal view */
+.section-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Section name badge */
+.section-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+/* Section beat count */
+.section-beats {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* Inline chord list - always visible */
+.chord-list-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* Individual chord cards - proportional width */
+.progression-chords {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  overflow: visible;
+  justify-content: center;
+}
+
+.chord-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  gap: 2px;
+  min-width: 30px;
+}
+
+.chord-card .chord-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.1px;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.chord-card .chord-duration {
+  font-size: 8px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.5);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.chord-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+  font-family: "JetBrains Mono", monospace;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+}
+
+/* Hover state - card lifts higher */
 .section-card:hover {
-  background-image:
-    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Cfilter id="paper"%3E%3CfeTurbulence baseFrequency="1.2" numOctaves="3"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23paper)" opacity="0.04"/%3E%3C/svg%3E'),
-    linear-gradient(
-      to bottom,
-      hsl(45, 25%, 20%),
-      hsl(45, 20%, 16%),
-      hsl(45, 15%, 12%)
-    );
-  
-  border-color: hsl(45, 25%, 28%);
-  
-  box-shadow: 
-    0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(30, 80%, 50%, 0.08),
-    inset 0 1px 0 hsl(45, 30%, 25%);
-  
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.75);
+
+  border-color: rgba(0, 0, 0, 0.3);
+
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+  transform: translateY(-2px);
 }
 
 /* Selected state - warm spotlight */
 .section-card.selected {
-  border-color: hsl(30, 60%, 45%);
-  
-  box-shadow: 
-    0 0 0 2px hsl(30, 60%, 45%, 0.4),
-    0 4px 16px hsl(0, 0%, 0%, 0.6),
-    0 0 30px hsl(30, 100%, 50%, 0.15),
-    inset 0 1px 0 hsl(45, 35%, 30%);
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.4);
+
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* Active/pressed state */
 .section-card:active {
   transform: translateY(0);
-  box-shadow: 
-    0 1px 3px hsl(0, 0%, 0%, 0.5),
-    inset 0 1px 0 hsl(45, 20%, 18%);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* Section name badge */
-.section-name {
+/* Extended info - shown only in expanded modes */
+.section-detail-expanded {
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.timeline-container.expanded .section-detail-expanded,
+.timeline-container.fullscreen .section-detail-expanded {
   display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: hsl(45, 45%, 82%);
-  margin-bottom: 6px;
-  letter-spacing: 0.3px;
 }
 
-/* Section metadata */
+.section-extra-info {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Section metadata (only visible in expanded modes) */
 .section-meta {
   display: flex;
   gap: 8px;
   font-size: 11px;
-  color: hsl(45, 25%, 60%);
-  font-family: 'JetBrains Mono', monospace;
+  color: rgba(0, 0, 0, 0.7);
+  font-family: "JetBrains Mono", monospace;
+  margin-bottom: 6px;
 }
 
 .section-meta-item {
@@ -324,31 +439,38 @@
 /* Repeat count badge */
 .repeat-badge {
   padding: 2px 6px;
-  background: hsl(30, 35%, 20%);
-  border: 1px solid hsl(30, 40%, 28%);
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 3px;
   font-size: 10px;
   font-weight: 600;
-  color: hsl(30, 50%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   letter-spacing: 0.2px;
 }
 
 /* ============================================================================
-   CHORD QUALITY COLORS - Warm Muted Palette
+   CHORD QUALITY COLORS - Disabled for section cards (kept for reference)
    ============================================================================ */
 
-/* Major chords - Warm honey gold */
+/* NOTE: Chord quality classes no longer apply backgrounds to section cards */
+/* They can be used for individual chord chips if needed */
 .chord-quality-maj {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-maj-bg), hsl(45, 35%, 14%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-maj-bg),
+    hsl(45, 35%, 14%)
+  );
   border-color: var(--timeline-quality-maj-border);
   color: var(--timeline-quality-maj);
 }
 
 .chord-quality-maj:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(45, 50%, 22%), hsl(45, 40%, 17%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(45, 50%, 22%),
+    hsl(45, 40%, 17%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
     0 0 20px hsl(45, 80%, 50%, 0.12),
     inset 0 1px 0 hsl(45, 55%, 30%);
@@ -356,33 +478,45 @@
 
 /* Minor chords - Cool slate blue with warmth */
 .chord-quality-min {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-min-bg), hsl(210, 20%, 12%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-min-bg),
+    hsl(210, 20%, 12%)
+  );
   border-color: var(--timeline-quality-min-border);
   color: var(--timeline-quality-min);
 }
 
 .chord-quality-min:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(210, 30%, 20%), hsl(210, 25%, 15%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(210, 30%, 20%),
+    hsl(210, 25%, 15%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(210, 60%, 50%, 0.10),
+    0 0 20px hsl(210, 60%, 50%, 0.1),
     inset 0 1px 0 hsl(210, 35%, 28%);
 }
 
 /* Dominant chords - Amber/orange warmth */
 .chord-quality-dom {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-dom-bg), hsl(30, 30%, 13%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-dom-bg),
+    hsl(30, 30%, 13%)
+  );
   border-color: var(--timeline-quality-dom-border);
   color: var(--timeline-quality-dom);
 }
 
 .chord-quality-dom:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(30, 45%, 22%), hsl(30, 35%, 16%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(30, 45%, 22%),
+    hsl(30, 35%, 16%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
     0 0 20px hsl(30, 80%, 50%, 0.14),
     inset 0 1px 0 hsl(30, 50%, 30%);
@@ -390,35 +524,43 @@
 
 /* Diminished chords - Deep burgundy */
 .chord-quality-dim {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-dim-bg), hsl(0, 25%, 11%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-dim-bg),
+    hsl(0, 25%, 11%)
+  );
   border-color: var(--timeline-quality-dim-border);
   color: var(--timeline-quality-dim);
 }
 
 .chord-quality-dim:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(0, 35%, 19%), hsl(0, 30%, 14%));
-  box-shadow: 
+  background-image: linear-gradient(135deg, hsl(0, 35%, 19%), hsl(0, 30%, 14%));
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(0, 60%, 40%, 0.10),
+    0 0 20px hsl(0, 60%, 40%, 0.1),
     inset 0 1px 0 hsl(0, 40%, 26%);
 }
 
 /* Augmented chords - Warm olive/yellow */
 .chord-quality-aug {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-aug-bg), hsl(55, 28%, 13%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-aug-bg),
+    hsl(55, 28%, 13%)
+  );
   border-color: var(--timeline-quality-aug-border);
   color: var(--timeline-quality-aug);
 }
 
 .chord-quality-aug:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(55, 40%, 21%), hsl(55, 33%, 16%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(55, 40%, 21%),
+    hsl(55, 33%, 16%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(55, 70%, 50%, 0.10),
+    0 0 20px hsl(55, 70%, 50%, 0.1),
     inset 0 1px 0 hsl(55, 45%, 28%);
 }
 
@@ -429,41 +571,35 @@
 .buffer-card {
   min-width: 140px;
   padding: 16px;
-  
-  background-image:
-    url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Cfilter id="old-paper"%3E%3CfeTurbulence baseFrequency="1.5" numOctaves="4"/%3E%3C/filter%3E%3Crect width="100" height="100" filter="url(%23old-paper)" opacity="0.06"/%3E%3C/svg%3E'),
-    linear-gradient(
-      135deg,
-      var(--timeline-buffer-bg),
-      hsl(40, 15%, 8%, 0.4)
-    );
-  
-  border: 1px dashed var(--timeline-buffer-border);
+
+  /* Transparent with subtle tint */
+  background: rgba(0, 0, 0, 0.03);
+
+  border: 1px dashed rgba(0, 0, 0, 0.2);
   border-radius: 4px;
-  
-  color: var(--timeline-buffer-text);
+
+  color: rgba(0, 0, 0, 0.6);
   font-size: 11px;
   font-style: italic;
   line-height: 1.5;
-  
-  /* Subtle aged paper effect */
-  box-shadow: 
-    inset 0 1px 0 hsl(40, 25%, 15%, 0.3),
-    inset 0 -1px 0 hsl(40, 10%, 5%, 0.4);
-  
+
+  /* Subtle shadow */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+
   pointer-events: none;
   user-select: none;
 }
 
 /* Info icon with warm glow */
 .buffer-card::before {
-  content: '~';
+  content: "~";
   display: inline-block;
   margin-right: 6px;
   opacity: 0.4;
-  color: hsl(40, 40%, 50%);
+  color: rgba(0, 0, 0, 0.5);
   font-size: 14px;
-  text-shadow: 0 0 6px hsl(40, 80%, 50%, 0.3);
 }
 
 /* Buffer card title */
@@ -471,7 +607,7 @@
   display: block;
   font-size: 10px;
   font-weight: 600;
-  color: hsl(40, 35%, 65%);
+  color: rgba(0, 0, 0, 0.7);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -480,7 +616,7 @@
 /* Buffer card content */
 .buffer-content {
   font-size: 11px;
-  color: hsl(40, 25%, 55%);
+  color: rgba(0, 0, 0, 0.6);
 }
 
 /* ============================================================================
@@ -489,43 +625,34 @@
 
 .duration-indicator {
   display: flex;
-  gap: 2px;
-  height: 20px;
-  margin-bottom: 8px;
-  border-radius: 2px;
+  gap: 0;
+  height: 8px;
+  width: 100%;
+  border-radius: 0;
   overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .duration-beat {
-  flex: 1;
-  background: linear-gradient(
-    to bottom,
-    hsl(30, 35%, 25%),
-    hsl(30, 30%, 18%)
-  );
-  border-radius: 1px;
-  
-  /* Warm inner glow */
-  box-shadow: 
-    inset 0 1px 2px hsl(30, 80%, 40%, 0.4),
-    inset 0 -1px 1px hsl(0, 0%, 0%, 0.3);
-  
-  opacity: 0.6;
-  transition: all 0.15s ease;
+  /* Width is set dynamically via inline styles */
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0;
+
+  box-shadow: none;
+
+  opacity: 1;
+  transition: all 0.1s ease;
+}
+
+.duration-beat:last-child {
+  border-right: none;
 }
 
 .duration-beat.active {
-  background: linear-gradient(
-    to bottom,
-    hsl(30, 60%, 45%),
-    hsl(30, 55%, 35%)
-  );
-  
-  box-shadow: 
-    0 0 8px hsl(30, 100%, 50%, 0.4),
-    inset 0 1px 2px hsl(30, 100%, 60%, 0.6),
-    inset 0 -1px 1px hsl(30, 40%, 20%);
-  
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.5);
   opacity: 1;
 }
 
@@ -537,12 +664,11 @@
 .section-card.dragging {
   opacity: 0.7;
   transform: scale(1.05) rotate(-1deg);
-  
-  box-shadow: 
-    0 12px 32px hsl(0, 0%, 0%, 0.7),
-    0 0 40px hsl(30, 100%, 50%, 0.2),
-    inset 0 1px 0 hsl(45, 40%, 35%);
-  
+
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+
   cursor: grabbing;
   z-index: 1000;
 }
@@ -555,7 +681,7 @@
   transform: translateY(-50%);
   width: 4px;
   height: 60%;
-  
+
   background: repeating-linear-gradient(
     to bottom,
     hsl(45, 20%, 30%),
@@ -563,7 +689,7 @@
     transparent 2px,
     transparent 4px
   );
-  
+
   border-radius: 2px;
   opacity: 0.3;
   cursor: grab;
@@ -585,29 +711,26 @@
   height: 100%;
   left: -6px;
   top: 0;
-  
-  background: linear-gradient(
-    to bottom,
-    hsl(30, 80%, 50%),
-    hsl(30, 70%, 40%)
-  );
-  
-  box-shadow: 
+
+  background: linear-gradient(to bottom, hsl(30, 80%, 50%), hsl(30, 70%, 40%));
+
+  box-shadow:
     0 0 12px hsl(30, 100%, 50%, 0.6),
     0 0 24px hsl(30, 100%, 50%, 0.3);
-  
+
   border-radius: 2px;
   z-index: 10;
-  
+
   animation: pulse-glow 1s ease-in-out infinite;
 }
 
 @keyframes pulse-glow {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 0.6;
     transform: scaleY(1);
   }
-  50% { 
+  50% {
     opacity: 1;
     transform: scaleY(1.05);
   }
@@ -619,7 +742,7 @@
 }
 
 .drop-zone-active::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -4px;
   border: 2px dashed hsl(30, 70%, 50%);
@@ -638,9 +761,7 @@
   gap: 16px;
   padding: 8px 16px;
   background: var(--timeline-paper-shadow);
-  border-bottom: 1px solid var(--timeline-paper-edge);
-  flex-shrink: 0;
-  min-height: 40px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .timeline-transport-controls {
@@ -654,21 +775,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  
-  background: hsl(45, 12%, 16%);
-  border: 1px solid hsl(45, 15%, 24%);
+
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  color: hsl(45, 35%, 70%);
-  
+  color: rgba(0, 0, 0, 0.7);
+
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .transport-btn:hover {
-  background: hsl(45, 16%, 20%);
-  border-color: hsl(45, 25%, 32%);
-  color: hsl(45, 45%, 82%);
-  box-shadow: 0 0 12px hsl(30, 80%, 50%, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 .transport-btn:active {
@@ -676,10 +796,9 @@
 }
 
 .transport-btn.playing {
-  background: hsl(30, 40%, 22%);
-  border-color: hsl(30, 50%, 30%);
-  color: hsl(30, 60%, 75%);
-  box-shadow: 0 0 16px hsl(30, 100%, 50%, 0.2);
+  background: rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 0, 0, 0.3);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 /* Position display */
@@ -688,43 +807,42 @@
   gap: 8px;
   align-items: center;
   padding: 6px 12px;
-  background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 12px;
-  color: hsl(30, 40%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   letter-spacing: 0.3px;
 }
 
 .position-separator {
-  color: hsl(45, 20%, 40%);
+  color: rgba(0, 0, 0, 0.4);
 }
 
 /* Loop toggle */
 .loop-toggle {
   padding: 6px 12px;
-  background: hsl(45, 12%, 14%);
-  border: 1px solid hsl(45, 15%, 22%);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
   font-size: 12px;
-  color: hsl(45, 30%, 65%);
+  color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
 }
 
 .loop-toggle:hover {
-  background: hsl(45, 16%, 18%);
-  border-color: hsl(45, 25%, 30%);
-  color: hsl(45, 40%, 75%);
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 .loop-toggle.active {
-  background: hsl(30, 35%, 20%);
-  border-color: hsl(30, 45%, 28%);
-  color: hsl(30, 55%, 78%);
-  box-shadow: 0 0 12px hsl(30, 100%, 50%, 0.15);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.3);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 /* ============================================================================
@@ -734,13 +852,10 @@
 .timeline-controls-panel {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: 16px;
+  padding: 12px 16px;
   background: var(--timeline-paper-shadow);
-  border-top: 1px solid var(--timeline-paper-edge);
-  flex-shrink: 0;
-  min-height: 40px;
-  align-items: flex-start;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .control-group {
@@ -751,7 +866,7 @@
 
 .control-label {
   font-size: 11px;
-  color: hsl(45, 25%, 55%);
+  color: rgba(0, 0, 0, 0.6);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   font-weight: 500;
@@ -763,11 +878,7 @@
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: linear-gradient(
-    to right,
-    hsl(30, 35%, 25%),
-    hsl(30, 30%, 18%)
-  );
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
@@ -778,55 +889,37 @@
   appearance: none;
   width: 14px;
   height: 14px;
-  background: linear-gradient(
-    135deg,
-    hsl(30, 45%, 50%),
-    hsl(30, 35%, 40%)
-  );
-  border: 1px solid hsl(30, 50%, 35%);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 
-    0 0 8px hsl(30, 80%, 50%, 0.3),
-    inset 0 1px 1px hsl(30, 60%, 60%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: all 0.15s ease;
 }
 
 .zoom-slider::-webkit-slider-thumb:hover {
-  background: linear-gradient(
-    135deg,
-    hsl(30, 50%, 55%),
-    hsl(30, 40%, 45%)
-  );
-  box-shadow: 
-    0 0 12px hsl(30, 100%, 50%, 0.5),
-    inset 0 1px 1px hsl(30, 70%, 70%);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .zoom-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  background: linear-gradient(
-    135deg,
-    hsl(30, 45%, 50%),
-    hsl(30, 35%, 40%)
-  );
-  border: 1px solid hsl(30, 50%, 35%);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 
-    0 0 8px hsl(30, 80%, 50%, 0.3),
-    inset 0 1px 1px hsl(30, 60%, 60%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* Preset buttons */
 .preset-btn {
   padding: 4px 10px;
-  background: hsl(45, 12%, 14%);
-  border: 1px solid hsl(45, 15%, 22%);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
   font-size: 11px;
-  color: hsl(45, 30%, 65%);
+  color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
   font-weight: 500;
@@ -834,40 +927,39 @@
 }
 
 .preset-btn:hover {
-  background: hsl(45, 16%, 18%);
-  border-color: hsl(45, 25%, 30%);
-  color: hsl(45, 40%, 75%);
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 .preset-btn.active {
-  background: hsl(30, 30%, 20%);
-  border-color: hsl(30, 40%, 28%);
-  color: hsl(30, 50%, 78%);
-  box-shadow: 0 0 8px hsl(30, 100%, 50%, 0.12);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.3);
+  color: rgba(0, 0, 0, 0.9);
 }
 
 /* Number inputs */
 .buffer-input {
   width: 50px;
   padding: 4px 8px;
-  background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
-  color: hsl(45, 40%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   text-align: center;
   outline: none;
   transition: all 0.15s ease;
 }
 
 .buffer-input:hover {
-  border-color: hsl(45, 25%, 30%);
+  border-color: rgba(0, 0, 0, 0.25);
 }
 
 .buffer-input:focus {
-  border-color: hsl(30, 50%, 40%);
-  box-shadow: 0 0 8px hsl(30, 100%, 50%, 0.15);
+  border-color: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
 }
 
 /* Checkbox toggle */
@@ -886,38 +978,37 @@
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  
-  background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
+
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 3px;
   position: relative;
   transition: all 0.15s ease;
 }
 
 .checkbox-toggle input[type="checkbox"]:hover {
-  border-color: hsl(45, 25%, 30%);
+  border-color: rgba(0, 0, 0, 0.25);
 }
 
 .checkbox-toggle input[type="checkbox"]:checked {
-  background: hsl(30, 35%, 25%);
-  border-color: hsl(30, 45%, 35%);
-  box-shadow: 0 0 8px hsl(30, 100%, 50%, 0.2);
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.3);
 }
 
 .checkbox-toggle input[type="checkbox"]:checked::after {
-  content: '✓';
+  content: "✓";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: hsl(30, 60%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   font-size: 12px;
   font-weight: bold;
 }
 
 .checkbox-label {
   font-size: 11px;
-  color: hsl(45, 30%, 65%);
+  color: rgba(0, 0, 0, 0.7);
 }
 
 /* ============================================================================
@@ -965,11 +1056,11 @@
   height: 12px;
   cursor: ns-resize;
   z-index: 100;
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   /* Subtle visual indicator */
   background: linear-gradient(
     to bottom,
@@ -979,7 +1070,7 @@
     hsl(45, 15%, 18%, 0.5) 60%,
     transparent
   );
-  
+
   transition: background 0.2s ease;
 }
 
@@ -995,7 +1086,7 @@
 }
 
 .timeline-resize-handle::before {
-  content: '';
+  content: "";
   width: 60px;
   height: 4px;
   background: linear-gradient(
@@ -1007,7 +1098,7 @@
     transparent
   );
   border-radius: 2px;
-  box-shadow: 
+  box-shadow:
     0 1px 0 hsl(45, 30%, 45%),
     0 -1px 0 hsl(45, 10%, 15%);
   transition: all 0.2s ease;
@@ -1022,7 +1113,7 @@
     hsl(30, 40%, 45%),
     transparent
   );
-  box-shadow: 
+  box-shadow:
     0 0 8px hsl(30, 80%, 50%, 0.3),
     0 1px 0 hsl(30, 50%, 55%),
     0 -1px 0 hsl(30, 20%, 25%);
@@ -1037,7 +1128,7 @@
     hsl(30, 60%, 50%),
     transparent
   );
-  box-shadow: 
+  box-shadow:
     0 0 12px hsl(30, 100%, 50%, 0.5),
     0 1px 0 hsl(30, 70%, 65%),
     0 -1px 0 hsl(30, 30%, 30%);
@@ -1049,35 +1140,34 @@
   top: -32px;
   right: 16px;
   z-index: 101;
-  
+
   padding: 6px 12px;
   background: var(--timeline-paper-base);
   border: 1px solid hsl(45, 15%, 22%);
   border-radius: 4px 4px 0 0;
-  
+
   display: flex;
   align-items: center;
   gap: 6px;
-  
+
   font-size: 11px;
-  color: hsl(45, 30%, 65%);
+  color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
-  
-  box-shadow: 
-    0 -2px 8px hsl(0, 0%, 0%, 0.3),
-    inset 0 1px 0 hsl(45, 20%, 20%);
-  
+
+  box-shadow:
+    0 -2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
   transition: all 0.2s ease;
 }
 
 .timeline-expand-btn:hover {
   background: var(--timeline-paper-highlight);
-  border-color: hsl(45, 25%, 30%);
-  color: hsl(45, 40%, 75%);
-  box-shadow: 
-    0 -4px 12px hsl(0, 0%, 0%, 0.4),
-    0 0 16px hsl(30, 80%, 50%, 0.1),
-    inset 0 1px 0 hsl(45, 25%, 25%);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.9);
+  box-shadow:
+    0 -4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .timeline-expand-btn svg {
@@ -1093,48 +1183,39 @@
 
 /* Quick size presets */
 .timeline-size-presets {
-  position: absolute;
-  top: -32px;
-  right: 120px;
-  z-index: 101;
-  
   display: flex;
-  gap: 2px;
-  background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
-  border-radius: 4px 4px 0 0;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
   padding: 2px;
-  
-  box-shadow: 
-    0 -2px 8px hsl(0, 0%, 0%, 0.3),
-    inset 0 1px 0 hsl(45, 20%, 20%);
 }
 
 .size-preset-btn {
-  padding: 4px 8px;
+  padding: 4px 10px;
   background: transparent;
   border: none;
   border-radius: 2px;
-  
-  font-size: 10px;
-  font-weight: 500;
-  color: hsl(45, 25%, 60%);
+
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.6);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  
+  letter-spacing: 0.5px;
+
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .size-preset-btn:hover {
-  background: hsl(45, 12%, 16%);
-  color: hsl(45, 35%, 70%);
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.8);
 }
 
 .size-preset-btn.active {
-  background: hsl(30, 30%, 20%);
-  color: hsl(30, 50%, 78%);
-  box-shadow: 0 0 8px hsl(30, 100%, 50%, 0.15);
+  background: rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.95);
+  font-weight: 900;
 }
 
 /* Overlay backdrop when fullscreen */
@@ -1156,7 +1237,9 @@
 
 /* Content area adjustments when timeline expands */
 .progression-editor-content {
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
 }
 
 .timeline-container.expanded ~ .progression-editor-content {
@@ -1181,10 +1264,17 @@
 .timeline-track-wrapper {
   position: relative;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0; /* Allow flex item to shrink */
+  overflow: clip;        /* Changed from 'hidden' — clip contains paint overflow
+                            without creating a new scroll container that could
+                            absorb the inner track's scrollable area */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/* REMOVED: Duplicate .timeline-track block was here.
+   The primary definition lives near line 85.
+   Visual overrides (border-radius, background) are merged there. */
 
 /* Multi-row layout for expanded view */
 .timeline-container.expanded .timeline-scroll-container,
@@ -1206,9 +1296,9 @@
   display: none;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid hsl(45, 15%, 20%);
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
   font-size: 11px;
-  color: hsl(45, 25%, 58%);
+  color: rgba(0, 0, 0, 0.6);
   line-height: 1.6;
 }
 
@@ -1227,11 +1317,12 @@
 
 .chord-chip {
   padding: 2px 6px;
-  background: hsl(45, 15%, 18%);
-  border: 1px solid hsl(45, 20%, 24%);
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 3px;
   font-size: 10px;
   font-weight: 500;
+  color: rgba(0, 0, 0, 0.8);
   letter-spacing: 0.2px;
 }
 
@@ -1241,24 +1332,24 @@
   top: 16px;
   right: 16px;
   z-index: 1001;
-  
+
   width: 36px;
   height: 36px;
   display: none;
   align-items: center;
   justify-content: center;
-  
+
   background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 50%;
-  
-  color: hsl(45, 35%, 70%);
+
+  color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
-  
-  box-shadow: 
+
+  box-shadow:
     0 2px 12px hsl(0, 0%, 0%, 0.5),
-    inset 0 1px 0 hsl(45, 20%, 20%);
-  
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
   transition: all 0.2s ease;
 }
 
@@ -1268,12 +1359,11 @@
 
 .timeline-fullscreen-close:hover {
   background: var(--timeline-paper-highlight);
-  border-color: hsl(30, 40%, 35%);
-  color: hsl(30, 50%, 80%);
-  box-shadow: 
-    0 4px 16px hsl(0, 0%, 0%, 0.6),
-    0 0 20px hsl(30, 80%, 50%, 0.15),
-    inset 0 1px 0 hsl(45, 25%, 25%);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.9);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .timeline-fullscreen-close svg {
@@ -1287,24 +1377,24 @@
   top: -36px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   padding: 4px 10px;
   background: var(--timeline-paper-shadow);
-  border: 1px solid var(--timeline-paper-edge);
+  border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  
-  font-family: 'JetBrains Mono', monospace;
+
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
-  color: hsl(30, 40%, 75%);
+  color: rgba(0, 0, 0, 0.8);
   white-space: nowrap;
-  
+
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
-  
-  box-shadow: 
-    0 2px 8px hsl(0, 0%, 0%, 0.6),
-    inset 0 1px 0 hsl(30, 20%, 20%);
+
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .timeline-resize-handle.dragging ~ .resize-tooltip {
@@ -1317,7 +1407,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-height: 0; /* Allow flex items to shrink below their content size */
 }
 
 /* Keyboard shortcut hint */
@@ -1326,13 +1415,13 @@
   bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   padding: 4px 8px;
-  background: hsl(0, 0%, 0%, 0.6);
+  background: rgba(0, 0, 0, 0.6);
   border-radius: 3px;
-  
+
   font-size: 10px;
-  color: hsl(45, 30%, 65%);
+  color: rgba(255, 255, 255, 0.9);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
@@ -1385,11 +1474,11 @@
     min-width: 120px;
     padding: 10px 12px;
   }
-  
+
   .timeline-controls-panel {
     gap: 12px;
   }
-  
+
   .zoom-slider {
     width: 100px;
   }
@@ -1400,12 +1489,12 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  
+
   .timeline-controls-panel {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .control-group {
     flex-wrap: wrap;
   }
@@ -1432,11 +1521,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .playhead-dial {
     animation: none;
   }
-  
+
   .drop-indicator {
     animation: none;
   }
@@ -1447,11 +1536,11 @@
   .section-card {
     border-width: 2px;
   }
-  
+
   .playhead-dial {
     width: 4px;
   }
-  
+
   .buffer-card {
     border-width: 2px;
   }

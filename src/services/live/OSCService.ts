@@ -1,63 +1,45 @@
 /**
- * OSC Service for Ableton Live Communication
- * Bidirectional OSC messaging between Electron and M4L helper device
+ * OSC Service for Ableton Live Communication (Renderer Process)
+ * Communicates with main process via IPC for OSC messaging
  */
 
-// Use require for osc to avoid missing declaration issues
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const oscAny: any = require("osc");
 import { OSC_ADDRESSES, OSCNote } from "../../types/osc";
 
-// Default ports (configurable)
-const DEFAULT_SEND_PORT = 11000; // Electron → Max
-const DEFAULT_RECEIVE_PORT = 11001; // Max → Electron
-
-let udpPort: any = null;
-let isConnected = false;
+// Message handlers storage
 let messageHandlers: Map<string, ((msg: any) => void)[]> = new Map();
+let isInitialized = false;
 
 /**
  * Initialize OSC communication
  */
-export function initializeOSC(
-  sendPort: number = DEFAULT_SEND_PORT,
-  receivePort: number = DEFAULT_RECEIVE_PORT,
+export async function initializeOSC(
+  _sendPort: number = 11000,
+  _receivePort: number = 11001,
 ): Promise<boolean> {
-  return new Promise((resolve) => {
-    try {
-      udpPort = new oscAny.UDPPort({
-        localAddress: "127.0.0.1",
-        localPort: receivePort,
-        remoteAddress: "127.0.0.1",
-        remotePort: sendPort,
-        metadata: true,
-      });
+  if (isInitialized) {
+    return true;
+  }
 
-      udpPort.on("ready", () => {
-        console.log("OSC Server ready on port", receivePort);
-        isConnected = true;
+  try {
+    // Set up message receiver from main process
+    window.electronAPI.onOSCMessage((message: any) => {
+      handleIncomingMessage(message);
+    });
 
-        // Send handshake
-        sendHandshake();
-        resolve(true);
-      });
+    // Initialize in main process
+    await window.electronAPI.sendOSC("/chordgen/initialize", []);
 
-      udpPort.on("message", (oscMsg: any) => {
-        handleIncomingMessage(oscMsg);
-      });
+    isInitialized = true;
+    console.log("[OSC Renderer] Initialized successfully");
 
-      udpPort.on("error", (error: any) => {
-        console.error("OSC Error:", error);
-        isConnected = false;
-        resolve(false);
-      });
+    // Send handshake
+    sendHandshake();
 
-      udpPort.open();
-    } catch (error) {
-      console.error("Failed to initialize OSC:", error);
-      resolve(false);
-    }
-  });
+    return isInitialized;
+  } catch (error) {
+    console.error("[OSC Renderer] Failed to initialize:", error);
+    return false;
+  }
 }
 
 /**
@@ -73,11 +55,10 @@ function sendHandshake(): void {
 /**
  * Handle incoming OSC messages
  */
-function handleIncomingMessage(oscMsg: any): void {
-  const address = oscMsg.address;
-  const args = oscMsg.args;
+function handleIncomingMessage(oscMsg: { address: string; args: any[] }): void {
+  const { address, args } = oscMsg;
 
-  console.log("OSC Received:", address, args);
+  console.log("[OSC Renderer] Received:", address, args);
 
   // Call registered handlers
   const handlers = messageHandlers.get(address);
@@ -117,21 +98,19 @@ export function onOSCMessage(
 }
 
 /**
- * Send OSC message
+ * Send OSC message via main process
  */
 function sendOSCMessage(address: string, args: any): void {
-  if (!udpPort || !isConnected) {
-    console.warn("OSC not connected");
+  if (!isInitialized) {
+    console.warn("[OSC Renderer] Not initialized");
     return;
   }
 
-  const oscMsg: any = {
-    address,
-    args: Array.isArray(args) ? args : [args],
-  };
-
-  if (udpPort && typeof udpPort.send === "function") {
-    udpPort.send(oscMsg);
+  try {
+    const argsArray = Array.isArray(args) ? args : [args];
+    window.electronAPI.sendOSC(address, argsArray);
+  } catch (error) {
+    console.error("[OSC Renderer] Send failed:", error);
   }
 }
 
@@ -188,13 +167,68 @@ export function setTempo(tempo: number): void {
 }
 
 /**
+ * Play transport
+ */
+export function play(): void {
+  sendOSCMessage(OSC_ADDRESSES.PLAY, []);
+}
+
+/**
+ * Pause transport
+ */
+export function pause(): void {
+  sendOSCMessage(OSC_ADDRESSES.PAUSE, []);
+}
+
+/**
+ * Stop transport
+ */
+export function stop(): void {
+  sendOSCMessage(OSC_ADDRESSES.STOP, []);
+}
+
+/**
+ * Jump by bars (positive or negative)
+ */
+export function jumpByBars(bars: number): void {
+  sendOSCMessage(OSC_ADDRESSES.JUMP_BY, [bars]);
+}
+
+/**
+ * Jump to specific beat
+ */
+export function jumpToBeat(beat: number): void {
+  sendOSCMessage(OSC_ADDRESSES.JUMP_TO, [beat]);
+}
+
+/**
+ * Play a specific chord immediately (Preview)
+ */
+export function playChord(
+  notes: number[],
+  velocity: number = 100,
+  duration: number = 500,
+): void {
+  sendOSCMessage("/chordgen/play_chord", {
+    notes,
+    velocity,
+    duration,
+  });
+}
+
+/**
  * Close OSC connection
  */
 export function closeOSC(): void {
-  if (udpPort) {
-    udpPort.close();
-    udpPort = null;
-    isConnected = false;
+  if (isInitialized) {
+    try {
+      window.electronAPI.sendOSC("/chordgen/close", []);
+      isInitialized = false;
+      messageHandlers.clear();
+      console.log("[OSC Renderer] Connection closed");
+    } catch (error) {
+      console.error("[OSC Renderer] Close failed:", error);
+    }
   }
 }
 
@@ -202,7 +236,7 @@ export function closeOSC(): void {
  * Get connection status
  */
 export function isOSCConnected(): boolean {
-  return isConnected;
+  return isInitialized;
 }
 
 /**

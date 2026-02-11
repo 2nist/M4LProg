@@ -63,6 +63,13 @@ export const OSC_ADDRESSES = {
   GET_TRANSPORT: "/live/get_transport",
   GET_TRACKS: "/live/get_tracks",
   SET_TEMPO: "/live/set_tempo",
+  
+  // Transport controls
+  PLAY: "/live/play",
+  PAUSE: "/live/pause",
+  STOP: "/live/stop",
+  JUMP_BY: "/live/jump_by",
+  JUMP_TO: "/live/jump_to",
 
   // Observations (Live → Electron)
   TRANSPORT_UPDATE: "/live/transport",

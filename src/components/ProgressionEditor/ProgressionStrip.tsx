@@ -1,7 +1,9 @@
 import { useMemo, useState, useRef, useEffect } from "react";
+import { computePxPerBeat } from "../../utils/pxPerBeat";
 import { motion } from "framer-motion";
 import { Section } from "../../types/progression";
 import type { Chord } from "../../types/chord";
+import { ZoomIn, ZoomOut } from "lucide-react";
 
 type Props = {
   // either provide a full section or a raw progression
@@ -17,6 +19,8 @@ type Props = {
   onUpdateSlot?: (index: number, patch: Partial<Chord>) => void;
   onSetSectionRepeats?: (repeats: number) => void;
   onSetSectionBeatsPerBar?: (beats: number) => void;
+  // Velocity drawer callback
+  onVelocityDrawerOpen?: (chordIndex: number) => void;
 };
 
 const NOTE_NAMES = [
@@ -36,24 +40,20 @@ const NOTE_NAMES = [
 
 function getPadColor(quality?: string) {
   if (!quality) return "pad-default muted-text";
-  switch (quality) {
-    case "Maj":
-    case "Maj7":
-      return "quality-maj";
-    case "min":
-    case "min7":
-      return "quality-min";
-    case "dom7":
-    case "dom9":
-      return "quality-dom";
-    case "dim":
-    case "dim7":
-      return "quality-dim";
-    case "aug":
-      return "quality-aug";
-    default:
-      return "pad-default muted-text";
-  }
+  
+  // Core theme colors (most common chords)
+  if (quality.includes("Maj")) return "quality-maj"; // Orange
+  if (quality.includes("min")) return "quality-min"; // Turquoise
+  if (quality.includes("dom")) return "quality-dom"; // Yellow
+  
+  // Outlier colors (special/rare chords)
+  if (quality.includes("dim")) return "quality-dim"; // Purple
+  if (quality.includes("aug")) return "quality-aug"; // Pink
+  if (quality.includes("sus")) return "quality-sus"; // Red
+  if (quality.includes("add") || quality.includes("9") || quality.includes("11") || quality.includes("13")) return "quality-ext"; // Green
+  if (quality.includes("b5") || quality.includes("#5") || quality.includes("#9") || quality.includes("b9")) return "quality-alt"; // Blue
+  
+  return "pad-default muted-text";
 }
 
 export default function ProgressionStrip(props: Props) {
@@ -64,16 +64,16 @@ export default function ProgressionStrip(props: Props) {
     selectedSlotIndex,
     onSelect,
     onSelectSlot,
-    compact = true,
+    compact: _compact = true,
     // onUpdateSlot (kept in Props for external use) is not used here
+    onUpdateSlot,
     onSetSectionRepeats,
     onSetSectionBeatsPerBar,
+    onVelocityDrawerOpen,
   } = props;
 
   const progression = progressionProp || section?.progression || [];
   const selected = selectedSlot ?? selectedSlotIndex ?? null;
-
-  const compactClass = compact ? "text-xs" : "text-sm";
 
   const [zoom, setZoom] = useState(0.45);
   const [fitToView, setFitToView] = useState(true); // Default to fit-to-view to avoid scrolling
@@ -101,12 +101,6 @@ export default function ProgressionStrip(props: Props) {
 
   const beatsPerBar = section?.beatsPerBar || 4;
 
-  // compute base pxPerBeat from zoom (use gentle curve for sensitivity)
-  const basePxPerBeat = useMemo(() => {
-    const t = Math.pow(zoom, 0.8); // non-linear feel
-    return Math.round(MIN_PX + (MAX_PX - MIN_PX) * t);
-  }, [zoom]);
-
   // measure container width
   useEffect(() => {
     const el = containerRef.current;
@@ -121,26 +115,17 @@ export default function ProgressionStrip(props: Props) {
   }, []);
 
   // responsive cap to avoid absurdly large px/beat on small viewports
+  // compute pxPerBeat using shared util
   const pxPerBeat = useMemo(() => {
-    if (!totalBeats) return basePxPerBeat;
-    const padding = 48; // left/right padding allowance
-
-    // if fit mode, compute px so entire progression fits available width
-    if (fitToView) {
-      const fit = Math.floor(
-        Math.max(4, (viewportWidth - padding) / totalBeats),
-      );
-      return Math.max(4, Math.min(basePxPerBeat, fit));
-    }
-
-    // otherwise, apply a responsive cap based on viewport and a minimum visible beats
-    const minVisibleBeats = 6; // prefer to show at least this many beats in overview
-    const responsiveCap = Math.max(
-      12,
-      Math.floor((viewportWidth - padding) / minVisibleBeats),
-    );
-    return Math.max(4, Math.min(basePxPerBeat, responsiveCap));
-  }, [fitToView, totalBeats, viewportWidth, basePxPerBeat]);
+    return computePxPerBeat({
+      zoom,
+      minPx: MIN_PX,
+      maxPx: MAX_PX,
+      fitToView,
+      totalBeats,
+      viewportWidth,
+    });
+  }, [zoom, fitToView, totalBeats, viewportWidth]);
 
   // inject dynamic CSS for container and slot widths to avoid inline styles in JSX
   useEffect(() => {
@@ -154,10 +139,8 @@ export default function ProgressionStrip(props: Props) {
 
     const sectionRepeats = section?.repeats || 1;
     const effectiveBeats = Math.max(1, totalBeats * sectionRepeats);
-    // Make container fit within viewport width when possible, but allow minimum width for readability
-    const maxContainerWidth = Math.max(400, viewportWidth - 48); // Account for padding
-    const naturalWidth = Math.max(200, effectiveBeats * pxPerBeat);
-    const containerWidth = Math.min(naturalWidth, maxContainerWidth);
+    // Allow natural width for chords - don't constrain to viewport, let it scroll
+    const containerWidth = Math.max(200, effectiveBeats * pxPerBeat);
     let css = ` .ps-container-${instanceId} { width: ${containerWidth}px; }\n`;
 
     progression.forEach((chord, idx) => {
@@ -221,118 +204,9 @@ export default function ProgressionStrip(props: Props) {
 
   return (
     <div className="w-full mt-3 overflow-y-hidden" ref={containerRef}>
-      <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold muted-text">Progression</h3>
-        <div className="flex items-center gap-3">
-            <div className="text-xs muted-text">Zoom</div>
-          <input
-            aria-label="Progression zoom"
-            title="Progression zoom"
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            className="compact"
-          />
-            <div className="text-xs muted-text">{pxPerBeat} px/beat</div>
-
-          {/* progression summary and section repeat controls */}
-          <div className="ml-3 text-xs muted-text flex items-center gap-3">
-            <div>
-                <div className="text-xs muted-text">Progression</div>
-              <div className="text-sm">
-                {Math.ceil(totalBeats / beatsPerBar)} bars • {totalBeats} beats
-              </div>
-            </div>
-
-            <div>
-                <div className="text-xs muted-text">Section repeats</div>
-              <div className="flex items-center gap-2">
-                <input
-                  aria-label="Section repeats"
-                  title="Section repeats (1-16)"
-                  type="number"
-                  min={1}
-                  max={16}
-                  value={section?.repeats || 1}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) || 1;
-                    const clamped = Math.max(1, Math.min(16, Math.floor(v)));
-                    onSetSectionRepeats?.(clamped);
-                  }}
-                  className="w-16 px-2 py-1 compact text-center"
-                />
-              </div>
-            </div>
-
-            <div>
-                <div className="text-xs muted-text">Beats / bar</div>
-              <div className="flex items-center gap-2">
-                <input
-                  aria-label="Beats per bar"
-                  title="Beats per bar (time signature)"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={section?.beatsPerBar || 4}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) || 4;
-                    const clamped = Math.max(1, Math.min(12, Math.floor(v)));
-                    onSetSectionBeatsPerBar?.(clamped);
-                  }}
-                  className="w-16 px-2 py-1 compact text-center"
-                />
-              </div>
-            </div>
-
-            <div>
-                <div className="text-xs muted-text">Section length</div>
-              <div className="text-sm">
-                {Math.ceil(
-                  (totalBeats * (section?.repeats || 1)) /
-                    (section?.beatsPerBar || 4),
-                )}{" "}
-                bars • {totalBeats * (section?.repeats || 1)} beats
-              </div>
-            </div>
-          </div>
-
-          <div className="ml-2 flex items-center gap-2">
-            <button
-              title="Fit to view"
-              onClick={() => setFitToView((v) => !v)}
-              className={`px-2 py-1 rounded compact ${fitToView ? "btn-primary" : "card"}`}
-            >
-              Fit
-            </button>
-            <button
-              title="Preset: Detailed"
-              onClick={() => {
-                setFitToView(false);
-                setZoom(0.95);
-              }}
-              className="px-2 py-1 card rounded compact"
-            >
-              2x
-            </button>
-            <button
-              title="Preset: Overview"
-              onClick={() => {
-                setFitToView(true);
-              }}
-              className="px-2 py-1 card rounded compact"
-            >
-              Auto
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div
         ref={scrollRef}
-        className="flex gap-2 overflow-x-hidden overflow-y-visible pb-6 cursor-grab active:cursor-grabbing select-none"
+        className="flex gap-2 overflow-x-auto overflow-y-visible pb-6 cursor-grab active:cursor-grabbing select-none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -341,7 +215,9 @@ export default function ProgressionStrip(props: Props) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        <div className={`flex items-end gap-2 mt-2.5 ps-container-${instanceId}`}>
+        <div
+          className={`flex items-end gap-2 mt-2.5 ps-container-${instanceId}`}
+        >
           {progression.map((chord, idx) => {
             const isSel = selected === idx;
             const quality = chord.metadata?.quality as any;
@@ -360,25 +236,59 @@ export default function ProgressionStrip(props: Props) {
                   animate={{ opacity: 1, scale: 1 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleSelect(idx)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onVelocityDrawerOpen?.(idx);
+                  }}
                   className={`h-20 w-full px-2 pt-0 pb-2 rounded-lg text-left transition-all flex flex-col ${getPadColor(
                     quality,
                   )} ${isSel ? "ring-2 ring-white shadow-lg scale-105" : "hover:brightness-110"}`}
                   title={`Slot ${idx + 1} - ${NOTE_NAMES[root % 12]} ${quality || ""}`}
                   aria-pressed={isSel}
                 >
-                  <div className="w-full flex justify-between h-5">
-                    {Array.from({ length: chord.duration || 1 }, (_, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 h-full bg-current opacity-60 rounded-sm mx-0.5"
-                      />
-                    ))}
+                  <div className="w-full flex justify-between h-5 gap-0.5 p-0.5">
+                    {Array.from({ length: chord.duration || 1 }, (_, beatIdx) => {
+                      const gate = chord.metadata?.gate || [];
+                      const isLegato = (gate[beatIdx] ?? 150) > 100;
+                      const velocity = chord.metadata?.velocities?.[beatIdx] ?? 100;
+                      const heightPercent = (velocity / 127) * 100;
+                      
+                      return (
+                        <div
+                          key={beatIdx}
+                          className={`flex-1 h-full rounded-sm transition-all cursor-pointer ${
+                            isLegato 
+                              ? 'bg-green-500 opacity-80 hover:opacity-100' 
+                              : 'bg-red-500 opacity-60 hover:opacity-80'
+                          }`}
+                          style={{
+                            minHeight: `${Math.max(20, heightPercent * 0.3)}%`
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Toggle break for this beat (default is legato)
+                            const newGate = [...(chord.metadata?.gate || Array(chord.duration).fill(150))];
+                            newGate[beatIdx] = (newGate[beatIdx] ?? 150) > 100 ? 100 : 150;
+                            onUpdateSlot?.(idx, {
+                              metadata: {
+                                ...chord.metadata,
+                                gate: newGate
+                              }
+                            });
+                          }}
+                          title={`Beat ${beatIdx + 1}: ${isLegato ? 'Legato (click to break)' : 'Break (click for legato)'} • Vel: ${velocity}`}
+                        />
+                      );
+                    })}
                   </div>
                   <div className="flex-1 flex flex-col justify-center items-center text-center">
                     <div
                       className={`font-semibold text-sm ${isEmpty ? "opacity-40 italic" : ""}`}
                     >
-                      {isEmpty ? "Empty" : `${NOTE_NAMES[root % 12]}${quality || ""}`}
+                      {isEmpty
+                        ? "Empty"
+                        : `${NOTE_NAMES[root % 12]}${quality || ""}`}
                     </div>
                     {!isEmpty && (
                       <div className="text-xs opacity-75 mt-1">
@@ -394,6 +304,71 @@ export default function ProgressionStrip(props: Props) {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Bottom controls bar - Zoom and Parameters */}
+      <div className="flex items-center gap-8 py-3 px-4 mt-2 border-t border-border bg-surface/30 rounded-lg">
+        {/* Zoom control */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] uppercase tracking-wide muted-text font-medium">Zoom</span>
+          <ZoomOut size={14} className="muted-text" />
+          <input
+            aria-label="Progression zoom"
+            title="Progression zoom"
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={zoom}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            className="progression-zoom-slider"
+          />
+          <ZoomIn size={14} className="muted-text" />
+          <span className="text-xs muted-text font-mono">{pxPerBeat}px/b</span>
+        </div>
+
+        {/* Spacer for chord view area */}
+        <div className="flex-1"></div>
+
+        {/* Section repeats slider */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] uppercase tracking-wide muted-text font-medium">Repeats</span>
+          <input
+            aria-label="Section repeats"
+            title="Section repeats (1-16)"
+            type="range"
+            min={1}
+            max={16}
+            step={1}
+            value={section?.repeats || 1}
+            onChange={(e) => {
+              const v = Number(e.target.value) || 1;
+              onSetSectionRepeats?.(v);
+            }}
+            className="progression-param-slider"
+          />
+          <span className="text-xs muted-text font-mono w-6 text-center">{section?.repeats || 1}</span>
+        </div>
+
+        {/* Beats per bar slider */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] uppercase tracking-wide muted-text font-medium">Beats/Bar</span>
+          <input
+            aria-label="Beats per bar"
+            title="Beats per bar (time signature)"
+            type="range"
+            min={1}
+            max={12}
+            step={1}
+            value={section?.beatsPerBar || 4}
+            onChange={(e) => {
+              const v = Number(e.target.value) || 4;
+              onSetSectionBeatsPerBar?.(v);
+            }}
+            className="progression-param-slider"
+          />
+          <span className="text-xs muted-text font-mono w-6 text-center">{section?.beatsPerBar || 4}</span>
         </div>
       </div>
     </div>

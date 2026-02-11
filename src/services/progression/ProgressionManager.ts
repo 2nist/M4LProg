@@ -174,7 +174,7 @@ export function cloneProgression(progression: Progression = []): Progression {
  * @returns Flattened progression with all repeats expanded
  */
 export function flattenSectionsWithRepeats(sections: Section[]): Progression {
-  return sections.flatMap(section => {
+  return sections.flatMap((section) => {
     const repeatCount = section.repeats || 1;
     return Array(repeatCount).fill(section.progression).flat();
   });

@@ -66,6 +66,16 @@ export interface ChordMetadata {
   
   /** Roman numeral analysis (e.g., "I", "V", "vi") */
   romanNumeral?: string;
+  
+  /** Per-beat MIDI velocities (0-127, index 0 = beat 1, etc. Default 100 for all) */
+  velocities?: number[];
+  
+  /** Per-beat strum delay in milliseconds (0-50ms, index 0 = beat 1, etc. Default 0 for all) */
+  strum?: number[];
+  
+  /** Per-beat gate length as percentage (0-200%, index 0 = beat 1, etc. Default 100 for all)
+   * <100% = staccato, 100% = normal, >100% = legato/tied */
+  gate?: number[];
 }
 
 /**

@@ -12,7 +12,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 // framer-motion: used in child components (ProgressionStrip), not directly here
-import { Save, Trash2, Plus, ArrowUp, Copy, Send } from "lucide-react";
+import { Trash2, Plus, ArrowUp, Copy, Send, Music2, Clock } from "lucide-react";
 import { InputModal, ConfirmModal } from "../Modal";
 import { useProgressionStore } from "@stores/progressionStore";
 import { useHardwareStore } from "@stores/hardwareStore";
@@ -21,6 +21,11 @@ import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
 import ProgressionStrip from "./ProgressionStrip";
 import { LoopTimeline } from "./LoopTimeline";
+import { BeatPadContextMenu } from "./BeatPadContextMenu";
+import VelocityCurveDrawer from "./VelocityCurveDrawer";
+import SongOverview from "./SongOverview";
+import ActiveSectionEditor from "./ActiveSectionEditor";
+import SongSettings from "./SongSettings";
 
 // ATOM SQ Constants
 const PAD_COUNT = 16;
@@ -93,6 +98,14 @@ const EXTENSIONS = [
   { value: 13, label: "13th" },
 ];
 
+// Drop voicings
+const DROP_VOICINGS = [
+  { value: 0, label: "Close" },
+  { value: 2, label: "Drop 2" },
+  { value: 3, label: "Drop 3" },
+  { value: 23, label: "Drop 2+4" },
+];
+
 export function ProgressionEditor() {
   const {
     getCurrentSection,
@@ -118,7 +131,7 @@ export function ProgressionEditor() {
     keyRoot: keyRoot,
     mode: mode,
     degree: 0, // 0 = Free, 1-7 = I-vii°
-    duration: 4,
+    drop: 0, // Drop voicing: 0=close, 2=drop2, 3=drop3, 23=drop2+4
     quality: "Maj" as ChordQuality,
     extension: 0, // 0 = none, 7, 9, 11, 13
     inversion: 0,
@@ -127,6 +140,28 @@ export function ProgressionEditor() {
 
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
+  
+  // Context menu state for beat pad MIDI editing (velocity per beat)
+  const [beatContextMenu, setBeatContextMenu] = useState<{
+    x: number;
+    y: number;
+    beatNumber: number;
+  } | null>(null);
+  
+  // Strum drag state for Zone 2 beat pads (vertical slider 0-50ms)
+  const [strumDrag, setStrumDrag] = useState<{
+    slotIndex: number;
+    beatNumber: number;
+    startY: number;
+    startStrum: number;
+    clicked: boolean;
+  } | null>(null);
+  
+  // Velocity curve drawer state for Zone 1 chord slots
+  const [velocityDrawer, setVelocityDrawer] = useState<{
+    slotIndex: number;
+    isOpen: boolean;
+  } | null>(null);
 
   const section = getCurrentSection();
   const progression = section.progression;
@@ -135,6 +170,71 @@ export function ProgressionEditor() {
   useEffect(() => {
     initializeMIDI();
   }, [initializeMIDI]);
+  
+  // Handle strum drag for Zone 2 beat pads (vertical slider)
+  useEffect(() => {
+    if (!strumDrag) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!strumDrag || strumDrag.clicked) return;
+      
+      const deltaY = e.clientY - strumDrag.startY;
+      const strumRange = 50; // 0-50ms
+      const pixelsPerMs = 1.5; // Sensitivity: ~75px for full range
+      const newStrum = Math.max(0, Math.min(strumRange, strumDrag.startStrum - (deltaY / pixelsPerMs)));
+      
+      // Update strum for this beat
+      if (selectedSlot !== null && progression[selectedSlot]) {
+        const chord = progression[selectedSlot];
+        const strum = chord.metadata?.strum || Array(chord.duration).fill(0);
+        strum[strumDrag.beatNumber - 1] = Math.round(newStrum);
+        
+        updateChord(selectedSlot, {
+          ...chord,
+          metadata: {
+            ...chord.metadata,
+            strum,
+          },
+        });
+      }
+    };
+    
+    const handleMouseUp = () => {
+      // If no significant drag occurred, treat as click (set duration)
+      if (strumDrag && strumDrag.clicked && selectedSlot !== null && progression[selectedSlot]) {
+        const chord = progression[selectedSlot];
+        updateChord(selectedSlot, {
+          ...chord,
+          duration: strumDrag.beatNumber,
+        });
+      }
+      setStrumDrag(null);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [strumDrag, selectedSlot, progression, updateChord]);
+  
+  // Save velocity curve from drawer
+  const handleVelocitySave = useCallback((velocities: number[]) => {
+    if (!velocityDrawer) return;
+    
+    const chord = progression[velocityDrawer.slotIndex];
+    if (!chord) return;
+    
+    updateChord(velocityDrawer.slotIndex, {
+      ...chord,
+      metadata: {
+        ...chord.metadata,
+        velocities,
+      },
+    });
+  }, [velocityDrawer, progression, updateChord]);
 
   // Sync encoder state with store
   useEffect(() => {
@@ -167,7 +267,7 @@ export function ProgressionEditor() {
       keyRoot,
       mode,
       degree,
-      duration,
+      drop,
       quality,
       extension,
       inversion,
@@ -226,12 +326,12 @@ export function ProgressionEditor() {
 
     return {
       notes,
-      duration,
+      duration: 4, // Default duration, can be changed via Zone 2 pads
       metadata: {
         root: chordRoot,
         quality: chordQuality,
         inversion,
-        drop: 0,
+        drop: drop,
       },
     };
   }, [encoderState]);
@@ -275,12 +375,17 @@ export function ProgressionEditor() {
   const getPadColor = useCallback((quality?: ChordQuality) => {
     if (!quality) return "pad-empty";
 
-    if (quality.includes("Maj")) return "quality-maj";
-    if (quality.includes("min")) return "quality-min";
-    if (quality.includes("dom")) return "quality-dom";
-    if (quality.includes("dim")) return "quality-dim";
-    if (quality.includes("aug")) return "quality-aug";
-    if (quality.includes("sus")) return "quality-maj";
+    // Core theme colors (most common chords)
+    if (quality.includes("Maj")) return "quality-maj"; // Orange
+    if (quality.includes("min")) return "quality-min"; // Turquoise
+    if (quality.includes("dom")) return "quality-dom"; // Yellow
+    
+    // Outlier colors (special/rare chords)
+    if (quality.includes("dim")) return "quality-dim"; // Purple
+    if (quality.includes("aug")) return "quality-aug"; // Pink
+    if (quality.includes("sus")) return "quality-sus"; // Red
+    if (quality.includes("add") || quality.includes("9") || quality.includes("11") || quality.includes("13")) return "quality-ext"; // Green
+    if (quality.includes("b5") || quality.includes("#5") || quality.includes("#9") || quality.includes("b9")) return "quality-alt"; // Blue
 
     return "pad-default";
   }, []);
@@ -325,7 +430,7 @@ export function ProgressionEditor() {
       if (index >= progression.length) return;
 
       const chord = progression[index];
-      const { root, quality, inversion } = chord.metadata || {};
+      const { root, quality, inversion, drop } = chord.metadata || {};
 
       if (root && quality) {
         setEncoderState((prev) => ({
@@ -333,7 +438,7 @@ export function ProgressionEditor() {
           keyRoot: root,
           quality,
           inversion: inversion || 0,
-          duration: chord.duration,
+          drop: drop || 0,
           degree: 0, // Switch to free mode when loading
         }));
       }
@@ -348,18 +453,35 @@ export function ProgressionEditor() {
         {/* Left Sidebar: Info View (Section + Display + Connection) */}
         <div className="flex flex-col order-first w-56 gap-2 p-2 overflow-y-auto panel border-r">
           <div className="card">
-            <div className="mb-1 text-xs muted-text">Section</div>
-            <div className="mb-2 text-lg font-bold quality-aug">
-              {section.name}
-            </div>
+            <SongOverview />
+          </div>
 
-            <div className="font-mono text-xs quality-maj">
-              {getChordDisplayName()} • {encoderState.duration} beats
+          {/* Active Section Editor (middle panel) */}
+          <div className="card">
+            <ActiveSectionEditor />
+          </div>
+
+          {/* Song Settings (bottom panel) */}
+          <div className="card">
+            <SongSettings />
+          </div>
+
+          {/* Progression Length */}
+          <div className="card">
+            <div className="mb-1 text-xs muted-text">Progression</div>
+            <div className="text-sm font-medium">
+              {Math.ceil(progression.reduce((sum, c) => sum + c.duration, 0) / (section.beatsPerBar || 4))} bars • {progression.reduce((sum, c) => sum + c.duration, 0)} beats
             </div>
-            <div className="mt-1 text-xs muted-text">
-              Key: {NOTE_NAMES[keyRoot % 12]} {mode} • {progression.length}{" "}
-              chords • {progression.reduce((sum, c) => sum + c.duration, 0)}{" "}
-              beats total
+          </div>
+
+          {/* Section Duration */}
+          <div className="card">
+            <div className="mb-1 text-xs muted-text">Section Length</div>
+            <div className="text-sm font-medium">
+              {Math.ceil(
+                (progression.reduce((sum, c) => sum + c.duration, 0) * (section.repeats || 1)) /
+                  (section.beatsPerBar || 4)
+              )} bars • {progression.reduce((sum, c) => sum + c.duration, 0) * (section.repeats || 1)} beats
             </div>
           </div>
 
@@ -382,14 +504,13 @@ export function ProgressionEditor() {
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <div className="grid grid-cols-4 gap-x-3 gap-y-2">
-                  {/* Encoder 1: Key/Root */}
+                  {/* Key/Root */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 1:{" "}
+                    <label className="text-[10px] muted-text block mb-1">
                       {encoderState.degree === 0 ? "Root Note" : "Key"}
                     </label>
                     <select
-                      title={`Encoder 1: ${encoderState.degree === 0 ? "Root Note" : "Key"}`}
+                      title={encoderState.degree === 0 ? "Root Note" : "Key"}
                       value={encoderState.keyRoot}
                       onChange={(e) =>
                         updateEncoder("keyRoot", Number(e.target.value))
@@ -404,13 +525,13 @@ export function ProgressionEditor() {
                     </select>
                   </div>
 
-                  {/* Encoder 2: Mode/Scale */}
+                  {/* Mode/Scale */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 2: Mode/Scale
+                    <label className="text-[10px] muted-text block mb-1">
+                      Mode/Scale
                     </label>
                     <select
-                      title="Encoder 2: Mode/Scale"
+                      title="Mode/Scale"
                       value={encoderState.mode}
                       onChange={(e) =>
                         updateEncoder("mode", e.target.value as ModaleName)
@@ -426,59 +547,16 @@ export function ProgressionEditor() {
                     </select>
                   </div>
 
-                  {/* Encoder 3: Diatonic Degree */}
+                  {/* Chord Quality */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 3: Diatonic Degree
-                    </label>
-                    <select
-                      title="Encoder 3: Diatonic Degree"
-                      value={encoderState.degree}
-                      onChange={(e) =>
-                        updateEncoder("degree", Number(e.target.value))
-                      }
-                      className="w-full text-xs rounded px-2 py-1 compact input"
-                    >
-                      {DEGREES.map((d) => (
-                        <option key={d.value} value={d.value}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Encoder 4: Duration */}
-                  <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 4: Duration
-                    </label>
-                    <input
-                      title="Encoder 4: Duration"
-                      type="range"
-                      min="1"
-                      max="16"
-                      value={encoderState.duration}
-                      onChange={(e) =>
-                        updateEncoder("duration", Number(e.target.value))
-                      }
-                      className="w-full h-2 compact"
-                    />
-                    <div className="text-xs muted-text text-center mt-0.5">
-                      {encoderState.duration} beat
-                      {encoderState.duration !== 1 ? "s" : ""}
-                    </div>
-                  </div>
-
-                  {/* Encoder 5: Chord Quality */}
-                  <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 5: Quality{" "}
+                    <label className="text-[10px] muted-text block mb-1">
+                      Quality{" "}
                       {encoderState.degree > 0 && (
                         <span className="muted-text">(Auto)</span>
                       )}
                     </label>
                     <select
-                      title="Encoder 5: Quality"
+                      title="Quality"
                       value={encoderState.quality}
                       onChange={(e) =>
                         updateEncoder("quality", e.target.value as ChordQuality)
@@ -494,13 +572,13 @@ export function ProgressionEditor() {
                     </select>
                   </div>
 
-                  {/* Encoder 6: Extension */}
+                  {/* Extension */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 6: Extension
+                    <label className="text-[10px] muted-text block mb-1">
+                      Extension
                     </label>
                     <select
-                      title="Encoder 6: Extension"
+                      title="Extension"
                       value={encoderState.extension}
                       onChange={(e) =>
                         updateEncoder("extension", Number(e.target.value))
@@ -515,13 +593,61 @@ export function ProgressionEditor() {
                     </select>
                   </div>
 
-                  {/* Encoder 7: Inversion */}
+                  {/* Diatonic Degree */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 7: Inversion
+                    <label className="text-[10px] muted-text block mb-1">
+                      Diatonic Degree
+                    </label>
+                    <select
+                      title="Diatonic Degree"
+                      value={encoderState.degree}
+                      onChange={(e) =>
+                        updateEncoder("degree", Number(e.target.value))
+                      }
+                      className="w-full h-8 text-xs compact"
+                    >
+                      {DEGREES.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="text-[10px] muted-text text-center mt-0.5">
+                      {DEGREES.find(d => d.value === encoderState.degree)?.label || "Root"}
+                    </div>
+                  </div>
+
+                  {/* Drop Voicing */}
+                  <div>
+                    <label className="text-[10px] muted-text block mb-1">
+                      Voicing
+                    </label>
+                    <select
+                      title="Drop Voicing"
+                      value={encoderState.drop}
+                      onChange={(e) =>
+                        updateEncoder("drop", Number(e.target.value))
+                      }
+                      className="w-full h-8 text-xs compact"
+                    >
+                      {DROP_VOICINGS.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="text-[10px] muted-text text-center mt-0.5">
+                      {DROP_VOICINGS.find(v => v.value === encoderState.drop)?.label || "Close"}
+                    </div>
+                  </div>
+
+                  {/* Inversion */}
+                  <div>
+                    <label className="text-[10px] muted-text block mb-1">
+                      Inversion
                     </label>
                     <input
-                      title="Encoder 7: Inversion"
+                      title="Inversion"
                       type="range"
                       min="0"
                       max="3"
@@ -531,18 +657,18 @@ export function ProgressionEditor() {
                       }
                       className="w-full h-2 compact"
                     />
-                    <div className="text-xs muted-text text-center mt-0.5">
+                    <div className="text-[10px] muted-text text-center mt-0.5">
                       {["Root", "1st", "2nd", "3rd"][encoderState.inversion]}
                     </div>
                   </div>
 
-                  {/* Encoder 8: Octave */}
+                  {/* Octave */}
                   <div>
-                    <label className="text-xs muted-text block mb-1.5">
-                      Encoder 8: Octave
+                    <label className="text-[10px] muted-text block mb-1">
+                      Octave
                     </label>
                     <input
-                      title="Encoder 8: Octave"
+                      title="Octave"
                       type="range"
                       min="-2"
                       max="2"
@@ -552,7 +678,7 @@ export function ProgressionEditor() {
                       }
                       className="w-full h-2 compact"
                     />
-                    <div className="text-xs muted-text text-center mt-0.5">
+                    <div className="text-[10px] muted-text text-center mt-0.5">
                       {encoderState.octave > 0
                         ? `+${encoderState.octave}`
                         : encoderState.octave}
@@ -565,60 +691,60 @@ export function ProgressionEditor() {
               <div className="w-32 grid grid-cols-2 gap-2 mt-1.5">
                 <button
                   onClick={handleAdd}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-maj rounded shadow compact active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
                   title="Add chord to progression"
                 >
-                  <Plus size={12} />
+                  <Plus size={10} />
                   ADD
                 </button>
 
                 <button
                   onClick={handleInsert}
                   disabled={selectedSlot === null}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-maj rounded shadow compact disabled:opacity-50 active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Insert before selected"
                 >
-                  <ArrowUp size={12} />
+                  <ArrowUp size={10} />
                   INSERT
                 </button>
 
                 <button
                   onClick={handleReplace}
                   disabled={selectedSlot === null || !progression[selectedSlot]}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-aug rounded shadow compact disabled:opacity-50 active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Replace selected chord"
                 >
-                  <Copy size={12} />
+                  <Copy size={10} />
                   REPLACE
                 </button>
 
                 <button
                   onClick={handleDelete}
                   disabled={selectedSlot === null || !progression[selectedSlot]}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-dim rounded shadow compact disabled:opacity-50 active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Delete selected chord"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={10} />
                   DELETE
                 </button>
 
                 <button
                   onClick={() => setShowClearModal(true)}
                   disabled={progression.length === 0}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-dim rounded shadow compact disabled:opacity-50 active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Clear all chords"
                 >
-                  <Trash2 size={12} />
+                  <Trash2 size={10} />
                   CLEAR
                 </button>
 
                 <button
                   onClick={handleSend}
                   disabled={progression.length === 0}
-                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[9px] font-semibold transition-all quality-min rounded shadow compact disabled:opacity-50 active:scale-95"
+                  className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Send to Ableton Live"
                 >
-                  <Send size={12} />
+                  <Send size={10} />
                   SEND
                 </button>
               </div>
@@ -628,9 +754,10 @@ export function ProgressionEditor() {
           {/* Main Content - Pads Area */}
           <div className="flex-1 px-6 py-2">
             <div className="mb-2">
-              <h3 className="mb-2 text-sm font-semibold muted-text">
-                Progression Slots (Upper Pads 52-67)
-              </h3>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Music2 size={14} className="opacity-50" />
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Progression</span>
+              </div>
               <div className="grid max-w-full gap-2 grid-cols-16">
                 {Array.from({ length: PAD_COUNT }, (_, i) => {
                   const chord = progression[i];
@@ -644,12 +771,18 @@ export function ProgressionEditor() {
                         selectSlot(i);
                         if (chord) loadSlotIntoEncoder(i);
                       }}
-                      className={`w-full h-12 sm:h-14 rounded flex flex-col items-center justify-center transition-transform transform active:scale-95 ${isEmpty ? "pad-empty slot-border" : `${getPadColor(chord.metadata?.quality)} slot-border`} ${isSelected ? "slot-selected" : ""} hover:brightness-110 text-xs font-bold compact gap-0.5`}
+                      onContextMenu={(e) => {
+                        if (!chord) return;
+                        e.preventDefault();
+                        // TODO: Open velocity curve drawer
+                        console.log('Open velocity drawer for slot', i);
+                      }}
+                      className={`relative w-full h-14 rounded transition-transform flex flex-col items-center justify-center text-xs font-bold compact gap-0.5 ${isEmpty ? "pad-empty" : getPadColor(chord.metadata?.quality)} ${isSelected ? "slot-selected" : ""} hover:brightness-110 active:scale-95`}
                       title={`Slot ${i + 1}${chord ? `: ${NOTE_NAMES[(chord.metadata?.root || 0) % 12]}${chord.metadata?.quality}` : " (Empty)"}`}
                     >
-                      <span className="text-[10px] opacity-60">{i + 1}</span>
+                      <span className="text-[10px] text-black opacity-70">{i + 1}</span>
                       {chord && (
-                        <span className="text-[11px] font-bold leading-tight">
+                        <span className="text-[11px] font-bold leading-tight text-black">
                           {NOTE_NAMES[(chord.metadata?.root || 0) % 12]}
                           <br />
                           {chord.metadata?.quality || ""}
@@ -663,12 +796,13 @@ export function ProgressionEditor() {
 
             {/* Lower Pads: Duration Visualization */}
             <div className="mb-2">
-              <h3 className="mb-2 text-sm font-semibold muted-text">
-                Duration (Lower Pads 36-51) -{" "}
-                {selectedSlot !== null && progression[selectedSlot]
-                  ? `Slot ${selectedSlot + 1}`
-                  : "No slot selected"}
-              </h3>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Clock size={14} className="opacity-50" />
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Duration</span>
+                {selectedSlot !== null && progression[selectedSlot] && (
+                  <span className="text-[9px] opacity-40 ml-1">• Slot {selectedSlot + 1}</span>
+                )}
+              </div>
               <div className="grid gap-2 grid-cols-16">
                 {Array.from({ length: PAD_COUNT }, (_, i) => {
                   const beatNumber = i + 1;
@@ -676,19 +810,33 @@ export function ProgressionEditor() {
                     selectedSlot !== null ? progression[selectedSlot] : null;
                   const isLit =
                     selectedChord && beatNumber <= selectedChord.duration;
+                  const strumValue = selectedChord?.metadata?.strum?.[beatNumber - 1] ?? 0;
 
                   return (
                     <button
                       key={i}
-                      onClick={() => {
-                        if (
-                          selectedSlot !== null &&
-                          progression[selectedSlot]
-                        ) {
-                          const chord = progression[selectedSlot];
-                          updateChord(selectedSlot, {
-                            ...chord,
-                            duration: beatNumber,
+                      onMouseDown={(e) => {
+                        if (selectedSlot === null || !progression[selectedSlot]) return;
+                        e.preventDefault();
+                        setStrumDrag({
+                          slotIndex: selectedSlot,
+                          beatNumber,
+                          startY: e.clientY,
+                          startStrum: strumValue,
+                          clicked: true,
+                        });
+                        // After 150ms or any mouse movement, it's a drag not a click
+                        setTimeout(() => {
+                          setStrumDrag(prev => prev ? { ...prev, clicked: false } : null);
+                        }, 150);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        if (selectedSlot !== null && progression[selectedSlot]) {
+                          setBeatContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            beatNumber,
                           });
                         }
                       }}
@@ -696,18 +844,36 @@ export function ProgressionEditor() {
                         selectedSlot === null || !progression[selectedSlot]
                       }
                       className={`
-                    aspect-square rounded flex items-center justify-center text-xs font-bold
-                    transition-all transform active:scale-95
-                    ${
-                      isLit
-                        ? `${getPadColor(selectedChord?.metadata?.quality)} brightness-110 duration-lit`
-                        : "pad-empty muted-text"
-                    }
-                    ${selectedSlot === null || !progression[selectedSlot] ? "cursor-not-allowed opacity-50" : "hover:brightness-125"}
+                    w-full h-14 rounded flex flex-col items-center justify-center text-xs font-bold
+                    transition-all transform active:scale-95 relative overflow-hidden
+                    ${isLit ? "duration-pad-on" : "duration-pad-off"}
+                    ${selectedSlot === null || !progression[selectedSlot] ? "cursor-not-allowed opacity-50" : "hover:brightness-110 cursor-ns-resize"}
                   `}
-                      title={`Set duration to ${beatNumber} beat${beatNumber !== 1 ? "s" : ""}`}
+                      title={`Drag vertically for strum (${strumValue}ms) • Click to set duration • Right-click for velocity`}
                     >
-                      {beatNumber}
+                      {/* Strum amount visual indicator - gradient from bottom */}
+                      {strumValue > 0 && isLit && (
+                        <div 
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            background: `linear-gradient(to top, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.25) ${(strumValue / 50) * 100}%, transparent ${(strumValue / 50) * 100}%)`
+                          }}
+                        />
+                      )}
+                      <span className="relative z-10">{beatNumber}</span>
+                      {/* Velocity indicator badge */}
+                      {selectedChord?.metadata?.velocities?.[beatNumber - 1] !== undefined && 
+                       selectedChord.metadata.velocities[beatNumber - 1] !== 100 && isLit && (
+                        <span className="absolute top-0.5 right-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
+                          V{selectedChord.metadata.velocities[beatNumber - 1]}
+                        </span>
+                      )}
+                      {/* Strum indicator badge */}
+                      {strumValue > 0 && isLit && (
+                        <span className="absolute top-0.5 left-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
+                          S{strumValue}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -747,6 +913,9 @@ export function ProgressionEditor() {
                   const updated = { ...section, beatsPerBar: beats };
                   updateCurrentSection(updated);
                 }}
+                onVelocityDrawerOpen={(chordIndex: number) => {
+                  setVelocityDrawer({ slotIndex: chordIndex, isOpen: true });
+                }}
               />
             </div>
           </div>
@@ -781,6 +950,41 @@ export function ProgressionEditor() {
         confirmText="Clear All"
         variant="danger"
       />
+      
+      {/* Beat Pad Context Menu */}
+      {beatContextMenu && selectedSlot !== null && progression[selectedSlot] && (
+        <BeatPadContextMenu
+          x={beatContextMenu.x}
+          y={beatContextMenu.y}
+          beatNumber={beatContextMenu.beatNumber}
+          velocity={progression[selectedSlot].metadata?.velocities?.[beatContextMenu.beatNumber - 1] ?? 100}
+          onUpdate={(velocity) => {
+            const chord = progression[selectedSlot];
+            const velocities = chord.metadata?.velocities || Array(chord.duration).fill(100);
+            velocities[beatContextMenu.beatNumber - 1] = velocity;
+            updateChord(selectedSlot, {
+              ...chord,
+              metadata: {
+                ...chord.metadata,
+                velocities,
+              },
+            });
+          }}
+          onClose={() => setBeatContextMenu(null)}
+        />
+      )}
+      
+      {/* Velocity Curve Drawer for Zone 3 chord cards */}
+      {velocityDrawer && velocityDrawer.isOpen && progression[velocityDrawer.slotIndex] && (
+        <VelocityCurveDrawer
+          isOpen={velocityDrawer.isOpen}
+          onClose={() => setVelocityDrawer(null)}
+          duration={progression[velocityDrawer.slotIndex].duration}
+          velocities={progression[velocityDrawer.slotIndex].metadata?.velocities || []}
+          onSave={handleVelocitySave}
+          chordName={`${NOTE_NAMES[(progression[velocityDrawer.slotIndex].metadata?.root || 0) % 12]}${progression[velocityDrawer.slotIndex].metadata?.quality}`}
+        />
+      )}
     </div>
   );
 }

@@ -249,7 +249,13 @@ export const useProgressionStore = create<ProgressionState>()(
 
       reorderSection: (fromIndex: number, toIndex: number) => {
         const { sections, currentSectionIndex } = get();
-        if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= sections.length || toIndex < 0 || toIndex >= sections.length) {
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          fromIndex >= sections.length ||
+          toIndex < 0 ||
+          toIndex >= sections.length
+        ) {
           return;
         }
 
@@ -261,9 +267,15 @@ export const useProgressionStore = create<ProgressionState>()(
         let newCurrentIndex = currentSectionIndex;
         if (currentSectionIndex === fromIndex) {
           newCurrentIndex = toIndex;
-        } else if (fromIndex < currentSectionIndex && toIndex >= currentSectionIndex) {
+        } else if (
+          fromIndex < currentSectionIndex &&
+          toIndex >= currentSectionIndex
+        ) {
           newCurrentIndex = currentSectionIndex - 1;
-        } else if (fromIndex > currentSectionIndex && toIndex <= currentSectionIndex) {
+        } else if (
+          fromIndex > currentSectionIndex &&
+          toIndex <= currentSectionIndex
+        ) {
           newCurrentIndex = currentSectionIndex + 1;
         }
 
@@ -473,3 +485,45 @@ export const useProgressionStore = create<ProgressionState>()(
     },
   ),
 );
+
+// Sanitize persisted sections in localStorage (assign UUIDs if missing)
+// This runs once on module load to avoid react-beautiful-dnd errors from old persisted data.
+(() => {
+  try {
+    const keysToTry = ["progression-storage", "zustand:progression-storage"];
+
+    for (const key of keysToTry) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        continue;
+      }
+
+      // Zustand persist may wrap state under { state: {...} }
+      const stateObj = parsed.state ?? parsed;
+      if (!stateObj || !Array.isArray(stateObj.sections)) continue;
+
+      const needFix = stateObj.sections.some((s: any) => !s || !s.id);
+      if (!needFix) continue;
+
+      stateObj.sections = stateObj.sections.map((s: any) => ({
+        ...(s || {}),
+        id: s?.id ?? crypto.randomUUID(),
+      }));
+
+      const out = parsed.state ? { ...parsed, state: stateObj } : stateObj;
+      localStorage.setItem(key, JSON.stringify(out));
+      // Once fixed, no need to try other keys
+      break;
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "progressionStore: failed to sanitize persisted sections",
+      err,
+    );
+  }
+})();

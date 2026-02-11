@@ -6,7 +6,22 @@
  */
 
 import { useCallback, useMemo, useRef, useEffect, useState, memo } from "react";
-import { ChevronUp, ChevronDown, X } from "lucide-react";
+import { 
+  X, 
+  SkipBack, 
+  Rewind, 
+  Play, 
+  Pause, 
+  FastForward, 
+  SkipForward, 
+  Repeat,
+  ZoomIn,
+  ZoomOut,
+  Minimize2,
+  Square,
+  Maximize2,
+  Maximize
+} from "lucide-react";
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -43,7 +58,6 @@ const midiToNoteName = (midi: number): string => {
 // Stable memoized TimelineSections component (defined at module scope to keep identity stable)
 // Track and warn once if sections lack ids to avoid console spam
 let warnedMissingDraggableId = false;
-const DISABLE_TIMELINE_DND = true; // Temporary troubleshooting flag
 
 function SortableSection({
   section,
@@ -109,15 +123,18 @@ function SortableSection({
                 : "";
             const quality = chord.metadata?.quality || "?";
             const fullChordName = rootNote ? `${rootNote}${quality}` : quality;
-
+            
             return (
               <div
                 key={chordIdx}
                 className="chord-card"
                 style={{ width: `${chordWidth}px` }}
               >
-                <span className="chord-name">{fullChordName}</span>
-                <span className="chord-duration">{chord.duration}b</span>
+                {/* Chord label */}
+                <div className="chord-label">
+                  <span className="chord-name">{fullChordName}</span>
+                  <span className="chord-duration">{chord.duration}b</span>
+                </div>
               </div>
             );
           })}
@@ -159,6 +176,8 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
   onDragEnd,
   markUserInteraction,
   disableDrag,
+  onVelocityDragStart,
+  onGateToggle,
 }: any) {
   const ids = sections.map((s: any) => String(s.id));
 
@@ -240,7 +259,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
                   : "";
               const quality = chord.metadata?.quality || "?";
               const fullChordName = rootNote ? `${rootNote}${quality}` : quality;
-
+              
               return (
                 <div key={chordIdx} className="chord-card" style={{ width: `${chordWidth}px` }}>
                   <span className="chord-name">{fullChordName}</span>
@@ -349,6 +368,8 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
                 pixelsPerBeat={pixelsPerBeat}
                 getActiveBeatInSection={getActiveBeatInSection}
                 markUserInteraction={markUserInteraction}
+                onVelocityDragStart={onVelocityDragStart}
+                onGateToggle={onGateToggle}
               />
             );
           })}
@@ -448,6 +469,10 @@ export function LoopTimeline() {
     }, 1000);
   }, []);
 
+  // Velocity and legato controls moved to Zone 3 (ProgressionStrip)
+  
+  const { updateChord } = useProgressionStore();
+
   // Auto-scroll: center the active beat under the fixed playhead.
   // Uses requestAnimationFrame to ensure layout is settled before scrolling.
   useEffect(() => {
@@ -527,7 +552,6 @@ export function LoopTimeline() {
     (fromIndex: number, toIndex: number) => {
       if (fromIndex === toIndex) return;
       reorderSection(fromIndex, toIndex);
-            disableDrag={DISABLE_TIMELINE_DND}
     },
     [reorderSection],
   );
@@ -562,26 +586,6 @@ export function LoopTimeline() {
         {isDragging && (
           <div className="resize-tooltip">{Math.round(height)} px</div>
         )}
-        {/* Expand/collapse button */}
-        <button
-          className="timeline-expand-btn"
-          onClick={toggle}
-          title={
-            mode === "normal" ? "Expand timeline (T)" : "Collapse timeline (T)"
-          }
-        >
-          {mode === "normal" || mode === "collapsed" ? (
-            <>
-              <ChevronUp size={14} />
-              Expand
-            </>
-          ) : (
-            <>
-              <ChevronDown size={14} />
-              Collapse
-            </>
-          )}
-        </button>
 
         {/* Fullscreen close button */}
         <button
@@ -594,105 +598,57 @@ export function LoopTimeline() {
 
         {/* Timeline content */}
         <div className="timeline-content">
-          {/* Navigation strip */}
+          {/* Top navigation strip - Zoom & View controls only */}
           <div className="timeline-nav-strip">
-            <div className="timeline-transport-controls">
-              <button
-                className="transport-btn"
-                onClick={() => jumpToBeat(0)}
-                title="Skip to start"
-              >
-                ⏮
-              </button>
-              <button
-                className="transport-btn"
-                onClick={() => jumpByBars(-1)}
-                title="Previous bar"
-              >
-                ⏪
-              </button>
-              <button
-                className={`transport-btn ${isPlaying ? "playing" : ""}`}
-                onClick={() =>
-                  isConnected
-                    ? isPlaying
-                      ? pause()
-                      : play()
-                    : isPlaying
-                      ? stopMock()
-                      : startMock()
-                }
-                title={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? "⏸" : "▶"}
-              </button>
-              {!isConnected && (
-                <button
-                  className={`transport-btn dev ${mockActive ? "playing" : ""}`}
-                  onClick={() => (mockActive ? stopMock() : startMock())}
-                  title={mockActive ? "Stop mock play" : "Dev mock play"}
-                >
-                  {mockActive ? "Dev⏸" : "Dev▶"}
-                </button>
-              )}
-              <button
-                className="transport-btn"
-                onClick={() => jumpByBars(1)}
-                title="Next bar"
-              >
-                ⏩
-              </button>
-              <button
-                className="transport-btn"
-                onClick={() => jumpToBeat(totalBeats - 1)}
-                title="Skip to end"
-              >
-                ⏭
-              </button>
+            <div className="control-group">
+              <span className="control-label">Zoom</span>
+              <ZoomOut size={14} style={{ color: "rgba(0, 0, 0, 0.5)" }} />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={zoomLevel}
+                onChange={(e) => setZoomLevel(Number(e.target.value))}
+                className="zoom-slider"
+                title="Zoom level"
+              />
+              <ZoomIn size={14} style={{ color: "rgba(0, 0, 0, 0.5)" }} />
+              <span className="zoom-display">
+                {pixelsPerBeat}px/b
+              </span>
             </div>
 
-            <div className="position-display">
-              <span>Bar: {currentBar}</span>
-              <span className="position-separator">|</span>
-              <span>Beat: {currentBeatInBar}</span>
-              <span className="position-separator">|</span>
-              <span>00:00 / 02:30</span>
-            </div>
-
-            {/* Size presets moved here */}
+            {/* Size presets */}
             <div className="timeline-size-presets">
               <button
                 className={`size-preset-btn ${mode === "collapsed" ? "active" : ""}`}
                 onClick={() => changeMode("collapsed")}
-                title="Min"
+                title="Collapsed view"
               >
-                MIN
+                <Minimize2 size={14} />
               </button>
               <button
                 className={`size-preset-btn ${mode === "normal" ? "active" : ""}`}
                 onClick={() => changeMode("normal")}
-                title="Norm"
+                title="Normal view"
               >
-                NORM
+                <Square size={14} />
               </button>
               <button
                 className={`size-preset-btn ${mode === "expanded" ? "active" : ""}`}
                 onClick={() => changeMode("expanded")}
-                title="Max"
+                title="Expanded view"
               >
-                MAX
+                <Maximize2 size={14} />
               </button>
               <button
                 className={`size-preset-btn ${mode === "fullscreen" ? "active" : ""}`}
                 onClick={() => changeMode("fullscreen")}
-                title="Full"
+                title="Fullscreen view"
               >
-                FULL
+                <Maximize size={14} />
               </button>
-            </div>
-
-            <div className="loop-toggle active" title="Loop enabled">
-              🔁 Loop
             </div>
           </div>
 
@@ -719,83 +675,81 @@ export function LoopTimeline() {
             </div>
           </div>
 
-          {/* Timeline controls panel */}
+          {/* Bottom controls panel - Transport controls */}
           <div className="timeline-controls-panel">
+            {/* Transport buttons */}
             <div className="control-group">
-              <span className="control-label">Zoom</span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={zoomLevel}
-                onChange={(e) => setZoomLevel(Number(e.target.value))}
-                className="zoom-slider"
-                title="Zoom level"
-              />
-              <span style={{ fontSize: "9px", color: "hsl(45, 30%, 65%)", whiteSpace: "nowrap" }}>
-                {pixelsPerBeat}px/b
-              </span>
-            </div>
-
-            <div className="control-group">
-              <button className="preset-btn">Fit</button>
-              <button className="preset-btn">2x</button>
-              <button className="preset-btn active">Auto</button>
               <button
-                className="preset-btn dev"
-                title="Center playhead (dev)"
-                onClick={() => {
-                  if (scrollContainerRef.current && totalBeats > 0) {
-                    const loopedBeat = currentBeat % totalBeats;
-                    const beatPosition = loopedBeat * pixelsPerBeat;
-                    const viewportWidth =
-                      scrollContainerRef.current.clientWidth;
-                    const targetScrollLeft = beatPosition - viewportWidth / 2;
-                    requestAnimationFrame(() => {
-                      if (scrollContainerRef.current) {
-                        scrollContainerRef.current.scrollLeft =
-                          targetScrollLeft;
-                      }
-                    });
-                  }
-                }}
+                className="transport-btn"
+                onClick={() => jumpToBeat(0)}
+                title="Skip to start"
               >
-                Center
+                <SkipBack size={16} />
+              </button>
+              <button
+                className="transport-btn"
+                onClick={() => jumpByBars(-1)}
+                title="Previous bar"
+              >
+                <Rewind size={16} />
+              </button>
+              <button
+                className={`transport-btn ${isPlaying ? "playing" : ""}`}
+                onClick={() =>
+                  isConnected
+                    ? isPlaying
+                      ? pause()
+                      : play()
+                    : isPlaying
+                      ? stopMock()
+                      : startMock()
+                }
+                title={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+              </button>
+              {!isConnected && (
+                <button
+                  className={`transport-btn dev ${mockActive ? "playing" : ""}`}
+                  onClick={() => (mockActive ? stopMock() : startMock())}
+                  title={mockActive ? "Stop mock play" : "Dev mock play"}
+                >
+                  {mockActive ? <Pause size={12} /> : <Play size={12} />}
+                </button>
+              )}
+              <button
+                className="transport-btn"
+                onClick={() => jumpByBars(1)}
+                title="Next bar"
+              >
+                <FastForward size={16} />
+              </button>
+              <button
+                className="transport-btn"
+                onClick={() => jumpToBeat(totalBeats - 1)}
+                title="Skip to end"
+              >
+                <SkipForward size={16} />
               </button>
             </div>
 
-            <div className="control-group">
-              <label className="checkbox-toggle">
-                <input type="checkbox" defaultChecked />
-                <span className="checkbox-label">Show Buffer</span>
-              </label>
+            {/* Position display */}
+            <div className="position-display">
+              <span>Bar {currentBar}</span>
+              <span className="position-separator">|</span>
+              <span>Beat {currentBeatInBar}</span>
+              <span className="position-separator">|</span>
+              <span>00:00</span>
             </div>
 
+            {/* Loop toggle */}
             <div className="control-group">
-              <span className="control-label">Pre:</span>
-              <input
-                type="number"
-                min="2"
-                max="8"
-                defaultValue="4"
-                className="buffer-input"
-                title="Pre-buffer bars"
-              />
+              <button className="transport-btn loop-toggle active" title="Loop enabled">
+                <Repeat size={16} />
+              </button>
             </div>
 
-            <div className="control-group">
-              <span className="control-label">Post:</span>
-              <input
-                type="number"
-                min="2"
-                max="8"
-                defaultValue="4"
-                className="buffer-input"
-                title="Post-buffer bars"
-              />
-            </div>
-
+            {/* Snap controls */}
             <div className="control-group">
               <span className="control-label">Snap</span>
               <label className="checkbox-toggle">
@@ -808,11 +762,28 @@ export function LoopTimeline() {
               </label>
             </div>
 
+            {/* Buffer controls */}
             <div className="control-group">
               <label className="checkbox-toggle">
-                <input type="checkbox" />
-                <span className="checkbox-label">Stop at end</span>
+                <input type="checkbox" defaultChecked />
+                <span className="checkbox-label">Buffer</span>
               </label>
+              <input
+                type="number"
+                min="2"
+                max="8"
+                defaultValue="4"
+                className="buffer-input"
+                title="Pre-buffer bars"
+              />
+              <input
+                type="number"
+                min="2"
+                max="8"
+                defaultValue="4"
+                className="buffer-input"
+                title="Post-buffer bars"
+              />
             </div>
           </div>
         </div>

@@ -13,8 +13,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('osc:send', address, args);
   },
   
-  onOSCMessage: (callback: (address: string, args: any[]) => void) => {
-    ipcRenderer.on('osc:message', (_event, address, args) => callback(address, args));
+  onOSCMessage: (callback: (message: any) => void) => {
+    const handler = (_event: any, address: string, args: any[]) => callback({ address, args });
+    ipcRenderer.on('osc:message', handler);
+    return () => ipcRenderer.removeListener('osc:message', handler);
   },
   
   // MIDI communication (to be implemented)
@@ -45,7 +47,7 @@ declare global {
   interface Window {
     electronAPI: {
       sendOSC: (address: string, args: any[]) => Promise<void>;
-      onOSCMessage: (callback: (address: string, args: any[]) => void) => void;
+      onOSCMessage: (callback: (message: any) => void) => () => void;
       getMIDIDevices: () => Promise<any[]>;
       sendMIDI: (deviceId: string, message: number[]) => Promise<void>;
       onMIDIMessage: (callback: (message: number[]) => void) => void;

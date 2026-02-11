@@ -38,6 +38,13 @@ interface LiveState {
   setTempo: (tempo: number) => void;
   selectTrack: (index: number) => void;
   disconnect: () => void;
+  
+  // Transport controls
+  play: () => void;
+  pause: () => void;
+  stop: () => void;
+  jumpByBars: (bars: number) => void;
+  jumpToBeat: (beat: number) => void;
 }
 
 export const useLiveStore = create<LiveState>()(
@@ -152,6 +159,46 @@ export const useLiveStore = create<LiveState>()(
         isConnected: false,
         tracks: [],
       });
+    },
+    
+    // Transport controls
+    play: () => {
+      // Update local transport state immediately for offline/dev mode
+      set((state) => ({ transport: { ...state.transport, isPlaying: true } }));
+      if (OSCService.isOSCConnected()) {
+        OSCService.play();
+      }
+    },
+
+    pause: () => {
+      set((state) => ({ transport: { ...state.transport, isPlaying: false } }));
+      if (OSCService.isOSCConnected()) {
+        OSCService.pause();
+      }
+    },
+
+    stop: () => {
+      set((state) => ({ transport: { ...state.transport, isPlaying: false, currentBeat: 0 } }));
+      if (OSCService.isOSCConnected()) {
+        OSCService.stop();
+      }
+    },
+
+    jumpByBars: (bars: number) => {
+      if (OSCService.isOSCConnected()) {
+        OSCService.jumpByBars(bars);
+      } else {
+        // adjust currentBeat locally (assume 4 beats per bar)
+        set((state) => ({ transport: { ...state.transport, currentBeat: Math.max(0, state.transport.currentBeat + bars * 4) } }));
+      }
+    },
+
+    jumpToBeat: (beat: number) => {
+      if (OSCService.isOSCConnected()) {
+        OSCService.jumpToBeat(beat);
+      } else {
+        set((state) => ({ transport: { ...state.transport, currentBeat: Math.max(0, beat) } }));
+      }
     },
   })),
 );

@@ -1,4 +1,4 @@
-import { WebMidi } from "webmidi";
+import { WebMidi, Input, Output } from "webmidi";
 
 /**
  * ATOM SQ Hardware Service
@@ -15,8 +15,32 @@ export const NOTE_ICON_BYTE = 0x0b; // Musical note icon
 // Encoder CC Mapping (14-21)
 const ENCODER_BASE_CC = 14;
 
-let output: any = null;
-let input: any = null;
+// Color Mapping for ATOM SQ (Standard Presonus Color Palette)
+export const PAD_COLORS = {
+  OFF: 0,
+  RED: 5,
+  ORANGE: 9,
+  YELLOW: 13,
+  LIME: 17,
+  GREEN: 21,
+  TEAL: 29,
+  CYAN: 33,
+  BLUE: 45,
+  PURPLE: 53,
+  MAGENTA: 57,
+  PINK: 61,
+  WHITE: 127,
+
+  // Semantic Mappings
+  PLAYING: 21, // Green
+  SELECTED: 127, // White
+  ROOT: 45, // Blue
+  IN_KEY: 5, // Red (Dim)
+  OUT_OF_KEY: 0, // Off
+} as const;
+
+let output: Output | null = null;
+let input: Input | null = null;
 
 /**
  * Initialize Web MIDI Access
@@ -24,21 +48,29 @@ let input: any = null;
  */
 export async function initializeMIDIAccess(): Promise<boolean> {
   try {
-    await WebMidi.enable({ sysex: true });
+    if (!WebMidi.enabled || !WebMidi.sysexEnabled) {
+      await WebMidi.enable({ sysex: true });
+    }
 
     console.log("SysEx enabled:", WebMidi.sysexEnabled);
-    console.log("Note: SysEx permission is required for display updates and native mode. Enable it in the browser MIDI prompt.");
+    console.log(
+      "Note: SysEx permission is required for display updates and native mode. Enable it in the browser MIDI prompt.",
+    );
 
     // Find ATOM SQ ports (or use first available)
     const outputs = WebMidi.outputs;
     const inputs = WebMidi.inputs;
 
     // Look for ATOM SQ in port names
-    output = outputs.find((port) => port.name?.includes("ATOM")) || outputs[0];
-    input = inputs.find((port) => port.name?.includes("ATOM")) || inputs[0];
+    output = outputs.find((port) => port.name.includes("ATOM")) || outputs[0];
+    input = inputs.find((port) => port.name.includes("ATOM")) || inputs[0];
 
     if (!output) {
-      console.warn("⚠️ No MIDI output found. Connect ATOM SQ and refresh.");
+      console.warn(
+        "Available MIDI Outputs:",
+        outputs.map((p) => p.name),
+      );
+      console.warn("ATOM SQ not found. MIDI features disabled.");
       return false;
     }
 
@@ -49,7 +81,7 @@ export async function initializeMIDIAccess(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.warn(
+    console.error(
       "⚠️ MIDI not available:",
       error instanceof Error ? error.message : error,
     );
@@ -62,7 +94,7 @@ export async function initializeMIDIAccess(): Promise<boolean> {
  * Should be called after MIDI access is granted
  */
 export function initializeNativeMode(): void {
-  if (!output) {
+  if (!output || output.state !== "connected") {
     console.warn("MIDI output not available");
     return;
   }
@@ -75,6 +107,7 @@ export function initializeNativeMode(): void {
   // Send MIDI bytes to the controller
   try {
     output.send(NATIVE_MODE_HANDSHAKE);
+    console.log("🤝 Native Mode Handshake sent");
   } catch (error) {
     console.warn("Failed to send native mode handshake:", error);
   }
@@ -92,7 +125,7 @@ export function updateDisplay(
   content: string | number[],
   rgb: [number, number, number] = [127, 127, 127],
 ): void {
-  if (!output) {
+  if (!output || output.state !== "connected") {
     console.warn("MIDI output not available");
     return;
   }
@@ -106,14 +139,7 @@ export function updateDisplay(
   if (Array.isArray(content)) {
     textBytes = content;
   } else {
-    // Handle special character placeholders in string
-    let processedContent = content;
-    // Replace ♪ with note icon byte (as string for mapping)
-    processedContent = processedContent.replace(
-      /♪/g,
-      String.fromCharCode(NOTE_ICON_BYTE),
-    );
-    textBytes = processedContent.split("").map((c) => c.charCodeAt(0));
+    textBytes = to7BitAscii(content);
   }
 
   const alignment = 0x01; // Center
@@ -131,8 +157,23 @@ export function updateDisplay(
   try {
     output.send(msg);
   } catch (error) {
-    console.warn("Failed to send display update:", error);
+    console.error("Failed to send display update:", error);
   }
+}
+
+/**
+ * Convert string to 7-bit ASCII bytes for SysEx
+ * Handles special characters and clamping
+ */
+function to7BitAscii(text: string): number[] {
+  // Replace known special characters
+  const processed = text.replace(/♪/g, String.fromCharCode(NOTE_ICON_BYTE));
+
+  return processed.split("").map((char) => {
+    const code = char.charCodeAt(0);
+    // Ensure 7-bit range (0-127)
+    return code > 127 ? 63 : code; // Replace invalid chars with '?'
+  });
 }
 
 /**
@@ -144,6 +185,9 @@ export function parseRelativeCC(
   value: number,
 ): { encoderIndex: number; delta: number } {
   let delta = 0;
+  // ATOM SQ uses relative binary offset (Two's Complement 7-bit)
+  // 0-63: Positive (+0 to +63)
+  // 64-127: Negative (-64 to -1)
   if (value <= 64) {
     delta = value; // Positive increment
   } else {
@@ -160,12 +204,16 @@ export function parseRelativeCC(
  * @param mode - 0: Off, 1: Blink, 2: Pulse, 127: Solid
  */
 export function setPadState(note: number, mode: number): void {
-  if (!output) {
+  if (!output || output.state !== "connected") {
     console.warn("MIDI output not available");
     return;
   }
 
-  output.send([0x90, note, mode]); // Ch 1 Note On
+  try {
+    output.send([0x90, note, mode]); // Ch 1 Note On
+  } catch (error) {
+    console.error(`Failed to set pad state for note ${note}:`, error);
+  }
 }
 
 /**
@@ -173,13 +221,19 @@ export function setPadState(note: number, mode: number): void {
  * @param onMessage - Callback for incoming MIDI messages
  */
 export function setupMIDIInput(onMessage: (data: any) => void): void {
-  if (!input) {
+  if (!input || input.state !== "connected") {
     console.warn("MIDI input not available");
     return;
   }
 
-  input.addListener("midimessage", (e: any) => {
-    onMessage(e.message);
+  // Remove existing listeners to prevent duplicates
+  input.removeListener("midimessage");
+
+  input.addListener("midimessage", (e) => {
+    // Pass the raw data array (Uint8Array)
+    if (e.message && e.message.data) {
+      onMessage(e.message.data);
+    }
   });
 }
 
@@ -196,14 +250,22 @@ export function getMIDIPorts(): {
   };
 }
 
-/**
- * Select specific MIDI ports
- */
 export function selectMIDIPorts(inputId?: string, outputId?: string): void {
   if (inputId) {
-    input = WebMidi.getInputById(inputId);
+    input = WebMidi.getInputById(inputId) || null;
   }
   if (outputId) {
-    output = WebMidi.getOutputById(outputId);
+    output = WebMidi.getOutputById(outputId) || null;
   }
+}
+
+/**
+ * Clean up MIDI listeners and references
+ */
+export function disconnect(): void {
+  if (input) {
+    input.removeListener("midimessage");
+    input = null;
+  }
+  output = null;
 }
