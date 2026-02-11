@@ -16,44 +16,44 @@
   --timeline-paper-highlight: hsl(45, 30%, 85%);
   --timeline-paper-shadow: hsl(45, 20%, 60%);
   --timeline-paper-edge: hsl(45, 25%, 50%);
-  
+
   /* Warm Studio Light */
   --timeline-light-primary: hsl(30, 100%, 50%);
   --timeline-light-secondary: hsl(30, 80%, 45%);
   --timeline-light-ambient: hsl(30, 40%, 35%);
   --timeline-light-glow: hsl(30, 100%, 50%, 0.3);
-  
+
   /* Brushed Metal Accents */
   --timeline-metal-light: hsl(30, 25%, 60%);
   --timeline-metal-mid: hsl(30, 20%, 45%);
   --timeline-metal-dark: hsl(30, 15%, 35%);
-  
+
   /* Chord Quality Colors (Warm Muted Palette) */
   --timeline-quality-maj: hsl(45, 55%, 78%);
   --timeline-quality-maj-bg: hsl(45, 45%, 18%);
   --timeline-quality-maj-border: hsl(45, 50%, 25%);
-  
+
   --timeline-quality-min: hsl(210, 40%, 75%);
   --timeline-quality-min-bg: hsl(210, 25%, 16%);
   --timeline-quality-min-border: hsl(210, 30%, 22%);
-  
+
   --timeline-quality-dom: hsl(30, 50%, 75%);
   --timeline-quality-dom-bg: hsl(30, 40%, 18%);
   --timeline-quality-dom-border: hsl(30, 45%, 25%);
-  
+
   --timeline-quality-dim: hsl(0, 40%, 70%);
   --timeline-quality-dim-bg: hsl(0, 30%, 15%);
   --timeline-quality-dim-border: hsl(0, 35%, 20%);
-  
+
   --timeline-quality-aug: hsl(55, 45%, 75%);
   --timeline-quality-aug-bg: hsl(55, 35%, 17%);
   --timeline-quality-aug-border: hsl(55, 40%, 24%);
-  
+
   /* Buffer & Info Cards */
   --timeline-buffer-bg: hsl(40, 20%, 10%, 0.3);
   --timeline-buffer-border: hsl(40, 20%, 20%, 0.5);
   --timeline-buffer-text: hsl(40, 25%, 55%);
-  
+
   /* Transitions */
   --timeline-transition-smooth: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --timeline-transition-tape: 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -86,56 +86,65 @@
   position: relative;
   width: 100%;
   min-height: 120px;
-  
+
   /* Layered background: texture + cylindrical gradient + vertical vignette */
   background-image: 
     /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
     /* Vertical vignette (cylinder curves away from viewer at top and bottom) */
-    linear-gradient(180deg,
-      rgba(0,0,0,0.2) 0%,
-      transparent 20%,
-      transparent 80%,
-      rgba(0,0,0,0.2) 100%
-    ),
-    /* Left edge shadow (straight horizontal fall toward center, uniform top-to-bottom) */
-    linear-gradient(90deg,
-      rgba(0,0,0,1.0) 0%, 
-      rgba(0,0,0,0.85) 1%,
-      rgba(0,0,0,0.6) 5%,
-      rgba(0,0,0,0.3) 15%,
-      rgba(0,0,0,0.08) 30%,
-      transparent 45%
-    ),
-    /* Right edge shadow (straight horizontal fall toward center, uniform top-to-bottom) */
-    linear-gradient(270deg,
-      rgba(0,0,0,1.0) 0%, 
-      rgba(0,0,0,0.85) 1%,
-      rgba(0,0,0,0.6) 5%,
-      rgba(0,0,0,0.3) 15%,
-      rgba(0,0,0,0.08) 30%,
-      transparent 45%
-    );
-  
+    linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.55) 0%,
+        rgba(0, 0, 0, 0.25) 12%,
+        transparent 30%,
+        transparent 70%,
+        rgba(0, 0, 0, 0.25) 88%,
+        rgba(0, 0, 0, 0.55) 100%
+      ),
+    /* Left edge shadow — extended reach for symmetrical cylinder curvature */
+    linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.90) 3%,
+        rgba(0, 0, 0, 0.70) 8%,
+        rgba(0, 0, 0, 0.50) 16%,
+        rgba(0, 0, 0, 0.32) 28%,
+        rgba(0, 0, 0, 0.18) 42%,
+        rgba(0, 0, 0, 0.08) 55%,
+        transparent 68%
+      ),
+    /* Right edge shadow — extended reach for symmetrical cylinder curvature */
+    linear-gradient(
+        270deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 0.90) 3%,
+        rgba(0, 0, 0, 0.70) 8%,
+        rgba(0, 0, 0, 0.50) 16%,
+        rgba(0, 0, 0, 0.32) 28%,
+        rgba(0, 0, 0, 0.18) 42%,
+        rgba(0, 0, 0, 0.08) 55%,
+        transparent 68%
+      );
+
   /* Uniform paper color (no horizontal variation - cylinder effect from edge shadows only) */
   background-color: var(--timeline-paper-base);
-  
+
   /* Cylinder edge definition */
   border-top: 1px solid var(--timeline-paper-edge);
   border-bottom: 1px solid var(--timeline-paper-shadow);
-  
+
   /* Depth with inner shadows - pronounced top shadow for depth */
-  box-shadow: 
-    inset 0 8px 16px rgba(0, 0, 0, 0.3),
-    inset 0 4px 8px rgba(0, 0, 0, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.4);
-  
-  /* Smooth scrolling with tape-like inertia */
+  box-shadow:
+    inset 0 12px 24px rgba(0, 0, 0, 0.45),
+    inset 0 6px 12px rgba(0, 0, 0, 0.30),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.35),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.20);
+
+  /* Scrollable track — NO scroll-behavior:smooth or scroll-snap here.
+     Both fight programmatic scrollLeft assignments from auto-scroll. */
   overflow-x: auto;
   overflow-y: hidden;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-  
+
   /* Hide scrollbar for cleaner look */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -150,9 +159,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 16px 24px;
+  padding: 0 50%;
   min-width: min-content;
-  
+  height: 100%;
+
   transition: transform var(--timeline-transition-tape);
 }
 
@@ -165,11 +175,11 @@
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: 4px;
   transform: translateX(-50%);
-  z-index: 100;
+  z-index: 200;
   pointer-events: none;
-  
+
   /* Brushed metal gradient */
   background: linear-gradient(
     to right,
@@ -177,67 +187,44 @@
     var(--timeline-metal-light),
     var(--timeline-metal-dark)
   );
-  
-  /* Warm amber glow from reading light */
-  box-shadow: 
-    0 0 8px var(--timeline-light-glow),
-    0 0 20px hsl(30, 100%, 50%, 0.15),
-    inset 0 0 1px hsl(30, 50%, 80%);
-  
+
+  /* Warm amber glow from reading light - more pronounced */
+  box-shadow:
+    0 0 12px var(--timeline-light-glow),
+    0 0 24px hsl(30, 100%, 50%, 0.25),
+    inset 0 0 2px hsl(30, 50%, 90%);
+
   animation: playhead-pulse 2s ease-in-out infinite;
 }
 
 /* Playhead pointer at top */
 .playhead-dial::before {
-  content: '';
+  content: "";
   position: absolute;
   top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   width: 0;
   height: 0;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-top: 8px solid var(--timeline-metal-mid);
-  
-  filter: drop-shadow(0 2px 4px hsl(0, 0%, 0%, 0.4));
-}
 
-/* Bar:beat readout display */
-.playhead-position {
-  position: absolute;
-  top: -36px;
-  left: 50%;
-  transform: translateX(-50%);
-  
-  padding: 6px 12px;
-  background: var(--timeline-paper-shadow);
-  border: 1px solid var(--timeline-paper-edge);
-  border-radius: 4px;
-  
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.8);
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  
-  box-shadow: 
-    0 2px 8px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  filter: drop-shadow(0 2px 4px hsl(0, 0%, 0%, 0.4));
 }
 
 /* Playhead pulse animation */
 @keyframes playhead-pulse {
-  0%, 100% { 
-    box-shadow: 
+  0%,
+  100% {
+    box-shadow:
       0 0 8px hsl(30, 100%, 50%, 0.3),
       0 0 20px hsl(30, 100%, 50%, 0.15),
       inset 0 0 1px hsl(30, 50%, 80%);
   }
-  50% { 
-    box-shadow: 
+  50% {
+    box-shadow:
       0 0 12px hsl(30, 100%, 50%, 0.5),
       0 0 28px hsl(30, 100%, 50%, 0.25),
       inset 0 0 1px hsl(30, 50%, 80%);
@@ -250,28 +237,47 @@
 
 .section-card {
   position: relative;
-  min-width: 200px;
+  /* Width is set dynamically via inline styles based on beat count */
   padding: 0;
-  
-  /* Light card background for better readability */
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(2px);
-  
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: transparent;
+
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 6px;
   overflow: hidden;
-  
+
   /* Card lift shadow - floats above cylinder surface */
-  box-shadow: 
-    0 3px 8px rgba(0, 0, 0, 0.2),
-    0 1px 3px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.10);
+
   cursor: pointer;
   user-select: none;
   scroll-snap-align: start;
-  
+
   transition: all var(--timeline-transition-smooth);
+}
+
+.section-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.18) 0%,
+      rgba(255, 255, 255, 0.12) 20%,
+      rgba(255, 255, 255, 0.18) 50%,
+      rgba(255, 255, 255, 0.06) 80%,
+      rgba(0, 0, 0, 0.15) 100%
+    );
+  z-index: 0;
+  pointer-events: none;
+  transition: inherit;
+}
+
+.section-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Section card content wrapper - adds padding back */
@@ -279,56 +285,153 @@
   padding: 8px 10px;
 }
 
-/* Hover state - card lifts higher */
+/* Section header - name only in normal view */
+.section-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Section name badge */
+.section-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+/* Section beat count */
+.section-beats {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* Inline chord list - always visible */
+.chord-list-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* Individual chord cards - proportional width */
+.progression-chords {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  overflow: visible;
+  justify-content: center;
+}
+
+.chord-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  gap: 2px;
+  min-width: 30px;
+}
+
+.chord-card .chord-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.9);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.1px;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.chord-card .chord-duration {
+  font-size: 8px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.5);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.chord-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.85);
+  font-family: "JetBrains Mono", monospace;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+}
+
+/* Hover state - no visual change to preserve cylinder effect */
+
 .section-card:hover {
-  background: rgba(255, 255, 255, 0.75);
-  
-  border-color: rgba(0, 0, 0, 0.3);
-  
-  box-shadow: 
-    0 6px 16px rgba(0, 0, 0, 0.25),
-    0 2px 6px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  
-  transform: translateY(-2px);
+  /* No hover styling - keeps cards flush with cylinder surface */
 }
 
 /* Selected state - warm spotlight */
+
+.section-card.selected::before {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(200, 150, 80, 0.45) 0%,
+      rgba(180, 130, 60, 0.30) 45%,
+      rgba(140, 100, 40, 0.20) 100%
+    );
+}
+
 .section-card.selected {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: rgba(0, 0, 0, 0.4);
-  
-  box-shadow: 
-    0 0 0 2px rgba(0, 0, 0, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border-color: hsl(30, 55%, 40%);
+
+  box-shadow:
+    0 0 0 2px hsla(30, 65%, 45%, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* Active/pressed state */
 .section-card:active {
   transform: translateY(0);
-  box-shadow: 
+  box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* Section name badge */
-.section-name {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.9);
-  margin-bottom: 6px;
-  letter-spacing: 0.3px;
+/* Extended info - shown only in expanded modes */
+.section-detail-expanded {
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-/* Section metadata */
+.timeline-container.expanded .section-detail-expanded,
+.timeline-container.fullscreen .section-detail-expanded {
+  display: block;
+}
+
+.section-extra-info {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Section metadata (only visible in expanded modes) */
 .section-meta {
   display: flex;
   gap: 8px;
   font-size: 11px;
   color: rgba(0, 0, 0, 0.7);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
+  margin-bottom: 6px;
 }
 
 .section-meta-item {
@@ -350,21 +453,28 @@
 }
 
 /* ============================================================================
-   CHORD QUALITY COLORS - Warm Muted Palette
+   CHORD QUALITY COLORS - Disabled for section cards (kept for reference)
    ============================================================================ */
 
-/* Major chords - Warm honey gold */
+/* NOTE: Chord quality classes no longer apply backgrounds to section cards */
+/* They can be used for individual chord chips if needed */
 .chord-quality-maj {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-maj-bg), hsl(45, 35%, 14%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-maj-bg),
+    hsl(45, 35%, 14%)
+  );
   border-color: var(--timeline-quality-maj-border);
   color: var(--timeline-quality-maj);
 }
 
 .chord-quality-maj:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(45, 50%, 22%), hsl(45, 40%, 17%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(45, 50%, 22%),
+    hsl(45, 40%, 17%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
     0 0 20px hsl(45, 80%, 50%, 0.12),
     inset 0 1px 0 hsl(45, 55%, 30%);
@@ -372,33 +482,45 @@
 
 /* Minor chords - Cool slate blue with warmth */
 .chord-quality-min {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-min-bg), hsl(210, 20%, 12%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-min-bg),
+    hsl(210, 20%, 12%)
+  );
   border-color: var(--timeline-quality-min-border);
   color: var(--timeline-quality-min);
 }
 
 .chord-quality-min:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(210, 30%, 20%), hsl(210, 25%, 15%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(210, 30%, 20%),
+    hsl(210, 25%, 15%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(210, 60%, 50%, 0.10),
+    0 0 20px hsl(210, 60%, 50%, 0.1),
     inset 0 1px 0 hsl(210, 35%, 28%);
 }
 
 /* Dominant chords - Amber/orange warmth */
 .chord-quality-dom {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-dom-bg), hsl(30, 30%, 13%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-dom-bg),
+    hsl(30, 30%, 13%)
+  );
   border-color: var(--timeline-quality-dom-border);
   color: var(--timeline-quality-dom);
 }
 
 .chord-quality-dom:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(30, 45%, 22%), hsl(30, 35%, 16%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(30, 45%, 22%),
+    hsl(30, 35%, 16%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
     0 0 20px hsl(30, 80%, 50%, 0.14),
     inset 0 1px 0 hsl(30, 50%, 30%);
@@ -406,35 +528,43 @@
 
 /* Diminished chords - Deep burgundy */
 .chord-quality-dim {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-dim-bg), hsl(0, 25%, 11%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-dim-bg),
+    hsl(0, 25%, 11%)
+  );
   border-color: var(--timeline-quality-dim-border);
   color: var(--timeline-quality-dim);
 }
 
 .chord-quality-dim:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(0, 35%, 19%), hsl(0, 30%, 14%));
-  box-shadow: 
+  background-image: linear-gradient(135deg, hsl(0, 35%, 19%), hsl(0, 30%, 14%));
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(0, 60%, 40%, 0.10),
+    0 0 20px hsl(0, 60%, 40%, 0.1),
     inset 0 1px 0 hsl(0, 40%, 26%);
 }
 
 /* Augmented chords - Warm olive/yellow */
 .chord-quality-aug {
-  background-image: 
-    linear-gradient(135deg, var(--timeline-quality-aug-bg), hsl(55, 28%, 13%));
+  background-image: linear-gradient(
+    135deg,
+    var(--timeline-quality-aug-bg),
+    hsl(55, 28%, 13%)
+  );
   border-color: var(--timeline-quality-aug-border);
   color: var(--timeline-quality-aug);
 }
 
 .chord-quality-aug:hover {
-  background-image: 
-    linear-gradient(135deg, hsl(55, 40%, 21%), hsl(55, 33%, 16%));
-  box-shadow: 
+  background-image: linear-gradient(
+    135deg,
+    hsl(55, 40%, 21%),
+    hsl(55, 33%, 16%)
+  );
+  box-shadow:
     0 4px 12px hsl(0, 0%, 0%, 0.5),
-    0 0 20px hsl(55, 70%, 50%, 0.10),
+    0 0 20px hsl(55, 70%, 50%, 0.1),
     inset 0 1px 0 hsl(55, 45%, 28%);
 }
 
@@ -445,30 +575,30 @@
 .buffer-card {
   min-width: 140px;
   padding: 16px;
-  
+
   /* Transparent with subtle tint */
   background: rgba(0, 0, 0, 0.03);
-  
+
   border: 1px dashed rgba(0, 0, 0, 0.2);
   border-radius: 4px;
-  
+
   color: rgba(0, 0, 0, 0.6);
   font-size: 11px;
   font-style: italic;
   line-height: 1.5;
-  
+
   /* Subtle shadow */
-  box-shadow: 
+  box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.05);
-  
+
   pointer-events: none;
   user-select: none;
 }
 
 /* Info icon with warm glow */
 .buffer-card::before {
-  content: '~';
+  content: "~";
   display: inline-block;
   margin-right: 6px;
   opacity: 0.4;
@@ -508,13 +638,14 @@
 }
 
 .duration-beat {
-  flex: 1;
+  /* Width is set dynamically via inline styles */
+  flex-shrink: 0;
   background: rgba(0, 0, 0, 0.15);
   border-right: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 0;
-  
+
   box-shadow: none;
-  
+
   opacity: 1;
   transition: all 0.1s ease;
 }
@@ -537,11 +668,11 @@
 .section-card.dragging {
   opacity: 0.7;
   transform: scale(1.05) rotate(-1deg);
-  
-  box-shadow: 
+
+  box-shadow:
     0 12px 32px rgba(0, 0, 0, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  
+
   cursor: grabbing;
   z-index: 1000;
 }
@@ -554,7 +685,7 @@
   transform: translateY(-50%);
   width: 4px;
   height: 60%;
-  
+
   background: repeating-linear-gradient(
     to bottom,
     hsl(45, 20%, 30%),
@@ -562,7 +693,7 @@
     transparent 2px,
     transparent 4px
   );
-  
+
   border-radius: 2px;
   opacity: 0.3;
   cursor: grab;
@@ -584,29 +715,26 @@
   height: 100%;
   left: -6px;
   top: 0;
-  
-  background: linear-gradient(
-    to bottom,
-    hsl(30, 80%, 50%),
-    hsl(30, 70%, 40%)
-  );
-  
-  box-shadow: 
+
+  background: linear-gradient(to bottom, hsl(30, 80%, 50%), hsl(30, 70%, 40%));
+
+  box-shadow:
     0 0 12px hsl(30, 100%, 50%, 0.6),
     0 0 24px hsl(30, 100%, 50%, 0.3);
-  
+
   border-radius: 2px;
   z-index: 10;
-  
+
   animation: pulse-glow 1s ease-in-out infinite;
 }
 
 @keyframes pulse-glow {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 0.6;
     transform: scaleY(1);
   }
-  50% { 
+  50% {
     opacity: 1;
     transform: scaleY(1.05);
   }
@@ -618,7 +746,7 @@
 }
 
 .drop-zone-active::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -4px;
   border: 2px dashed hsl(30, 70%, 50%);
@@ -634,10 +762,15 @@
 .timeline-nav-strip {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 16px;
+  gap: 12px;
+  padding: 4px 12px;
   background: var(--timeline-paper-shadow);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  min-height: 40px;
+  max-height: 40px;
 }
 
 .timeline-transport-controls {
@@ -646,17 +779,18 @@
 }
 
 .transport-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  
+  font-size: 14px;
+
   background: rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
   color: rgba(0, 0, 0, 0.7);
-  
+
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -680,16 +814,17 @@
 /* Position display */
 .position-display {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  padding: 6px 12px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  border-radius: 3px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
   color: rgba(0, 0, 0, 0.8);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  height: 26px;
 }
 
 .position-separator {
@@ -698,15 +833,17 @@
 
 /* Loop toggle */
 .loop-toggle {
-  padding: 6px 12px;
+  padding: 4px 8px;
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 3px;
+  font-size: 11px;
   color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  height: 26px;
+  line-height: 1;
 }
 
 .loop-toggle:hover {
@@ -728,30 +865,37 @@
 .timeline-controls-panel {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 12px 16px;
-  background: var(--timeline-paper-shadow);
+  gap: 8px;
+  padding: 4px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05), transparent);
   border-top: 1px solid rgba(0, 0, 0, 0.15);
+  align-items: center;
+  min-height: 32px;
+  max-height: 32px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .control-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  flex-wrap: nowrap;
 }
 
 .control-label {
-  font-size: 11px;
+  font-size: 9px;
   color: rgba(0, 0, 0, 0.6);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Zoom slider */
 .zoom-slider {
-  width: 120px;
-  height: 4px;
+  width: 80px;
+  height: 3px;
   -webkit-appearance: none;
   appearance: none;
   background: rgba(0, 0, 0, 0.15);
@@ -763,13 +907,13 @@
 .zoom-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: all 0.15s ease;
 }
 
@@ -779,27 +923,29 @@
 }
 
 .zoom-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* Preset buttons */
 .preset-btn {
-  padding: 4px 10px;
+  padding: 2px 6px;
   background: rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: 3px;
+  font-size: 9px;
   color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
   transition: all 0.15s ease;
   font-weight: 500;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
+  height: 18px;
+  line-height: 1;
 }
 
 .preset-btn:hover {
@@ -816,17 +962,19 @@
 
 /* Number inputs */
 .buffer-input {
-  width: 50px;
-  padding: 4px 8px;
+  width: 35px;
+  padding: 2px 4px;
   background: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  border-radius: 3px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
   color: rgba(0, 0, 0, 0.8);
   text-align: center;
   outline: none;
   transition: all 0.15s ease;
+  height: 18px;
+  line-height: 1;
 }
 
 .buffer-input:hover {
@@ -842,49 +990,72 @@
 .checkbox-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   cursor: pointer;
   user-select: none;
 }
 
-.checkbox-toggle input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
+.checkbox-toggle input[type="checkbox"],
+.checkbox-toggle input[type="radio"] {
+  width: 12px;
+  height: 12px;
   margin: 0;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  
+
   background: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 3px;
   position: relative;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
-.checkbox-toggle input[type="checkbox"]:hover {
+.checkbox-toggle input[type="checkbox"]:hover,
+.checkbox-toggle input[type="radio"]:hover {
   border-color: rgba(0, 0, 0, 0.25);
 }
 
-.checkbox-toggle input[type="checkbox"]:checked {
+.checkbox-toggle input[type="checkbox"]:checked,
+.checkbox-toggle input[type="radio"]:checked {
   background: rgba(0, 0, 0, 0.12);
   border-color: rgba(0, 0, 0, 0.3);
 }
 
 .checkbox-toggle input[type="checkbox"]:checked::after {
-  content: '✓';
+  content: "✓";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   color: rgba(0, 0, 0, 0.8);
-  font-size: 12px;
+  font-size: 9px;
   font-weight: bold;
+  line-height: 1;
+}
+
+/* Radio button - circular style */
+.checkbox-toggle input[type="radio"] {
+  border-radius: 50%;
+}
+
+.checkbox-toggle input[type="radio"]:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
 }
 
 .checkbox-label {
-  font-size: 11px;
+  font-size: 9px;
   color: rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
 }
 
 /* ============================================================================
@@ -905,7 +1076,7 @@
 }
 
 .timeline-container.normal {
-  height: 200px; /* Default comfortable view */
+  height: 240px; /* Default comfortable view with full controls */
 }
 
 .timeline-container.expanded {
@@ -932,11 +1103,11 @@
   height: 12px;
   cursor: ns-resize;
   z-index: 100;
-  
+
   display: flex;
   align-items: center;
   justify-content: center;
-  
+
   /* Subtle visual indicator */
   background: linear-gradient(
     to bottom,
@@ -946,7 +1117,7 @@
     hsl(45, 15%, 18%, 0.5) 60%,
     transparent
   );
-  
+
   transition: background 0.2s ease;
 }
 
@@ -962,7 +1133,7 @@
 }
 
 .timeline-resize-handle::before {
-  content: '';
+  content: "";
   width: 60px;
   height: 4px;
   background: linear-gradient(
@@ -974,7 +1145,7 @@
     transparent
   );
   border-radius: 2px;
-  box-shadow: 
+  box-shadow:
     0 1px 0 hsl(45, 30%, 45%),
     0 -1px 0 hsl(45, 10%, 15%);
   transition: all 0.2s ease;
@@ -989,7 +1160,7 @@
     hsl(30, 40%, 45%),
     transparent
   );
-  box-shadow: 
+  box-shadow:
     0 0 8px hsl(30, 80%, 50%, 0.3),
     0 1px 0 hsl(30, 50%, 55%),
     0 -1px 0 hsl(30, 20%, 25%);
@@ -1004,7 +1175,7 @@
     hsl(30, 60%, 50%),
     transparent
   );
-  box-shadow: 
+  box-shadow:
     0 0 12px hsl(30, 100%, 50%, 0.5),
     0 1px 0 hsl(30, 70%, 65%),
     0 -1px 0 hsl(30, 30%, 30%);
@@ -1016,24 +1187,24 @@
   top: -32px;
   right: 16px;
   z-index: 101;
-  
+
   padding: 6px 12px;
   background: var(--timeline-paper-base);
   border: 1px solid hsl(45, 15%, 22%);
   border-radius: 4px 4px 0 0;
-  
+
   display: flex;
   align-items: center;
   gap: 6px;
-  
+
   font-size: 11px;
   color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
-  
-  box-shadow: 
+
+  box-shadow:
     0 -2px 8px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  
+
   transition: all 0.2s ease;
 }
 
@@ -1041,7 +1212,7 @@
   background: var(--timeline-paper-highlight);
   border-color: rgba(0, 0, 0, 0.25);
   color: rgba(0, 0, 0, 0.9);
-  box-shadow: 
+  box-shadow:
     0 -4px 12px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
@@ -1059,37 +1230,30 @@
 
 /* Quick size presets */
 .timeline-size-presets {
-  position: absolute;
-  top: -32px;
-  right: 120px;
-  z-index: 101;
-  
   display: flex;
-  gap: 2px;
-  background: var(--timeline-paper-base);
-  border: 1px solid hsl(45, 15%, 22%);
-  border-radius: 4px 4px 0 0;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
   padding: 2px;
-  
-  box-shadow: 
-    0 -2px 8px hsl(0, 0%, 0%, 0.3),
-    inset 0 1px 0 hsl(45, 20%, 20%);
 }
 
 .size-preset-btn {
-  padding: 4px 8px;
+  padding: 3px 8px;
   background: transparent;
   border: none;
   border-radius: 2px;
-  
-  font-size: 10px;
-  font-weight: 500;
+
+  font-size: 9px;
+  font-weight: 700;
   color: rgba(0, 0, 0, 0.6);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  
+  letter-spacing: 0.4px;
+
   cursor: pointer;
   transition: all 0.15s ease;
+  height: 22px;
+  line-height: 1;
 }
 
 .size-preset-btn:hover {
@@ -1098,8 +1262,9 @@
 }
 
 .size-preset-btn.active {
-  background: rgba(0, 0, 0, 0.12);
-  color: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.95);
+  font-weight: 900;
 }
 
 /* Overlay backdrop when fullscreen */
@@ -1121,7 +1286,9 @@
 
 /* Content area adjustments when timeline expands */
 .progression-editor-content {
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
 }
 
 .timeline-container.expanded ~ .progression-editor-content {
@@ -1144,10 +1311,16 @@
 
 /* Scrollable content in expanded modes */
 .timeline-track-wrapper {
+  position: relative;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/* REMOVED: Duplicate .timeline-track block was here.
+   Kept only the first definition (lines 85-145) to avoid specificity conflicts. */
 
 /* Multi-row layout for expanded view */
 .timeline-container.expanded .timeline-scroll-container,
@@ -1205,24 +1378,24 @@
   top: 16px;
   right: 16px;
   z-index: 1001;
-  
+
   width: 36px;
   height: 36px;
   display: none;
   align-items: center;
   justify-content: center;
-  
+
   background: var(--timeline-paper-base);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 50%;
-  
+
   color: rgba(0, 0, 0, 0.7);
   cursor: pointer;
-  
-  box-shadow: 
+
+  box-shadow:
     0 2px 12px hsl(0, 0%, 0%, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  
+
   transition: all 0.2s ease;
 }
 
@@ -1234,7 +1407,7 @@
   background: var(--timeline-paper-highlight);
   border-color: rgba(0, 0, 0, 0.25);
   color: rgba(0, 0, 0, 0.9);
-  box-shadow: 
+  box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
@@ -1250,22 +1423,22 @@
   top: -36px;
   left: 50%;
   transform: translateX(-50%);
-  
+
   padding: 4px 10px;
   background: var(--timeline-paper-shadow);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  
-  font-family: 'JetBrains Mono', monospace;
+
+  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   color: rgba(0, 0, 0, 0.8);
   white-space: nowrap;
-  
+
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
-  
-  box-shadow: 
+
+  box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
@@ -1280,28 +1453,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* Keyboard shortcut hint */
-.timeline-shortcut-hint {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  
-  padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 3px;
-  
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.9);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
-.timeline-container:hover .timeline-shortcut-hint {
-  opacity: 1;
 }
 
 /* ============================================================================
@@ -1347,11 +1498,11 @@
     min-width: 120px;
     padding: 10px 12px;
   }
-  
+
   .timeline-controls-panel {
     gap: 12px;
   }
-  
+
   .zoom-slider {
     width: 100px;
   }
@@ -1362,12 +1513,12 @@
     flex-wrap: wrap;
     gap: 8px;
   }
-  
+
   .timeline-controls-panel {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .control-group {
     flex-wrap: wrap;
   }
@@ -1394,11 +1545,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  
+
   .playhead-dial {
     animation: none;
   }
-  
+
   .drop-indicator {
     animation: none;
   }
@@ -1409,11 +1560,11 @@
   .section-card {
     border-width: 2px;
   }
-  
+
   .playhead-dial {
     width: 4px;
   }
-  
+
   .buffer-card {
     border-width: 2px;
   }
