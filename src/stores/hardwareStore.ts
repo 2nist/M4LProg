@@ -3,7 +3,6 @@ import { subscribeWithSelector } from "zustand/middleware";
 import * as HardwareService from "../services/hardware/HardwareService";
 import { useProgressionStore } from "./progressionStore";
 import { WebMidi } from "webmidi";
-import * as OSCService from "../services/live/OSCService";
 
 interface HardwareState {
   // Connection state
@@ -29,7 +28,7 @@ interface HardwareState {
 }
 
 export const useHardwareStore = create<HardwareState>()(
-  subscribeWithSelector((set) => ({
+  subscribeWithSelector((set, get) => ({
     // Initial state
     isConnected: false,
     midiAccessGranted: false,

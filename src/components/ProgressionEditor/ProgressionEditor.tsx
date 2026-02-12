@@ -16,7 +16,7 @@ import { Trash2, Plus, ArrowUp, Copy, Send, Music2, Clock } from "lucide-react";
 import { InputModal, ConfirmModal } from "../Modal";
 import { useProgressionStore } from "@stores/progressionStore";
 import { useHardwareStore } from "@stores/hardwareStore";
-import type { ChordQuality } from "@/types/chord";
+import type { ChordQuality, ChordMetadata } from "@/types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
 import ProgressionStrip from "./ProgressionStrip";
@@ -26,6 +26,9 @@ import VelocityCurveDrawer from "./VelocityCurveDrawer";
 import SongOverview from "./SongOverview";
 import ActiveSectionEditor from "./ActiveSectionEditor";
 import SongSettings from "./SongSettings";
+import LeftNavMenu from "./LeftNavMenu";
+import ToolsPanel from "./ToolsPanel";
+import FocusTrap from "../common/FocusTrap";
 
 // ATOM SQ Constants
 const PAD_COUNT = 16;
@@ -106,6 +109,18 @@ const DROP_VOICINGS = [
   { value: 23, label: "Drop 2+4" },
 ];
 
+// Local interfaces to replace any types
+interface ChordUpdate {
+  notes: number[];
+  duration: number;
+  metadata?: ChordMetadata;
+}
+
+interface SlotPatch {
+  duration?: number;
+  metadata?: Partial<ChordMetadata>;
+}
+
 export function ProgressionEditor() {
   const {
     getCurrentSection,
@@ -123,6 +138,7 @@ export function ProgressionEditor() {
     selectSlot,
     updateCurrentSection,
   } = useProgressionStore();
+  const { openDrawer, setOpenDrawer } = useProgressionStore();
 
   const { initializeMIDI, isConnected } = useHardwareStore();
 
@@ -247,13 +263,13 @@ export function ProgressionEditor() {
 
   // Update encoder state function
   const updateEncoder = useCallback(
-    (field: string, value: any) => {
+    (field: string, value: string | number) => {
       setEncoderState((prev) => {
         const newState = { ...prev, [field]: value };
 
         // Sync key/mode changes to store
-        if (field === "keyRoot") setKeyRoot(value);
-        if (field === "mode") setMode(value);
+        if (field === "keyRoot") setKeyRoot(value as number);
+        if (field === "mode") setMode(value as ModaleName);
 
         return newState;
       });
@@ -451,48 +467,67 @@ export function ProgressionEditor() {
       {/* Main Content: Left Sidebar + Right Area */}
       <div className="flex flex-row flex-1 overflow-hidden">
         {/* Left Sidebar: Info View (Section + Display + Connection) */}
-        <div className="flex flex-col order-first w-56 gap-2 p-2 overflow-y-auto panel border-r">
-          <div className="card">
-            <SongOverview />
-          </div>
-
-          {/* Active Section Editor (middle panel) */}
-          <div className="card">
-            <ActiveSectionEditor />
-          </div>
-
-          {/* Song Settings (bottom panel) */}
-          <div className="card">
-            <SongSettings />
-          </div>
-
-          {/* Progression Length */}
-          <div className="card">
-            <div className="mb-1 text-xs muted-text">Progression</div>
-            <div className="text-sm font-medium">
-              {Math.ceil(progression.reduce((sum, c) => sum + c.duration, 0) / (section.beatsPerBar || 4))} bars • {progression.reduce((sum, c) => sum + c.duration, 0)} beats
+        <div className="flex flex-col order-first w-56 gap-2 p-2 panel border-r">
+          {/* Header — Critical info (25%) */}
+          <div className="flex-none h-1/4 overflow-hidden">
+            <div className="card h-full">
+              <SongOverview />
             </div>
           </div>
 
-          {/* Section Duration */}
-          <div className="card">
-            <div className="mb-1 text-xs muted-text">Section Length</div>
-            <div className="text-sm font-medium">
-              {Math.ceil(
-                (progression.reduce((sum, c) => sum + c.duration, 0) * (section.repeats || 1)) /
-                  (section.beatsPerBar || 4)
-              )} bars • {progression.reduce((sum, c) => sum + c.duration, 0) * (section.repeats || 1)} beats
+          {/* Middle — Navigation menu (now also renders contextual drawer) */}
+          <div className="flex-1 overflow-auto">
+            <div className="card h-full p-2 relative">
+              <div className={`flip-container ${openDrawer ? "is-flipped" : ""}`}>
+                <div className="flip-inner">
+                  <div className="flip-front">
+                    <LeftNavMenu />
+                  </div>
+
+                  <div
+                    className="flip-back"
+                    role="dialog"
+                    aria-label={openDrawer ? `${openDrawer} panel` : "context panel"}
+                    aria-hidden={!openDrawer}
+                    tabIndex={-1}
+                  >
+                    <div className="p-2 h-full">
+                      <FocusTrap active={!!openDrawer}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-semibold capitalize">{openDrawer}</div>
+                        <button
+                          className="btn-muted px-2 py-1"
+                          onClick={() => setOpenDrawer(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 overflow-auto h-[calc(100%-3rem)]">
+                        {openDrawer === "sections" && <SongOverview />}
+                        {openDrawer === "settings" && <SongSettings />}
+                        {openDrawer === "sections-active" && <ActiveSectionEditor />}
+                        {openDrawer === "patterns" && (
+                          <div className="text-xs muted-text">Patterns panel (TODO)</div>
+                        )}
+                        {openDrawer === "library" && (
+                          <div className="text-xs muted-text">Library panel (TODO)</div>
+                        )}
+                        {openDrawer === "export" && (
+                          <div className="text-xs muted-text">Export options (TODO)</div>
+                        )}
+
+                        <div className="pt-2 border-t border-panel/20 mt-2">
+                          <ToolsPanel />
+                        </div>
+                      </div>
+                    </FocusTrap>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
-          {isConnected && (
-            <div className="flex items-center gap-2 px-3 py-1 status-pill">
-              <div className="w-2 h-2 status-on rounded-full animate-pulse" />
-              <span className="text-xs font-medium status-on-text">
-                ATOM SQ
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Right Content Area */}
@@ -881,7 +916,7 @@ export function ProgressionEditor() {
             </div>
 
             {/* Compact Progression Strip - placed under Duration as a visual reference */}
-            <div className="w-full overflow-y-visible overflow-x-hidden pb-6">
+            <div className="w-full overflow-y-visible overflow-x-hidden pb-6 mt-3">
               <ProgressionStrip
                 section={section}
                 selectedSlot={selectedSlot}
@@ -890,20 +925,18 @@ export function ProgressionEditor() {
                   loadSlotIntoEncoder(i);
                 }}
                 compact
-                onUpdateSlot={(idx: number, patch) => {
+                onUpdateSlot={(idx: number, patch: SlotPatch) => {
                   const chord = progression[idx];
                   if (!chord) return;
-                  const merged = {
+                  const merged: ChordUpdate = {
                     ...chord,
                     ...patch,
                     metadata: {
                       ...(chord.metadata || {}),
-                      ...(patch && (patch as any).metadata
-                        ? (patch as any).metadata
-                        : {}),
+                      ...(patch.metadata || {}),
                     },
                   };
-                  updateChord(idx, merged as any);
+                  updateChord(idx, merged);
                 }}
                 onSetSectionRepeats={(repeats: number) => {
                   const updated = { ...section, repeats };

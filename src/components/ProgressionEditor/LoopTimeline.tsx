@@ -55,6 +55,46 @@ const midiToNoteName = (midi: number): string => {
   return noteNames[midi % 12];
 };
 
+// Local interfaces to replace any types
+interface ChordData {
+  duration: number;
+  metadata?: {
+    root?: number;
+    quality?: string;
+  };
+}
+
+interface SectionData {
+  id: string | number;
+  name: string;
+  progression: ChordData[];
+  repeats?: number;
+  beatsPerBar?: number;
+}
+
+interface SortableSectionProps {
+  section: SectionData;
+  index: number;
+  pixelsPerBeat: number;
+  getActiveBeatInSection: (index: number) => number;
+  markUserInteraction: () => void;
+  onVelocityDragStart?: (section: SectionData, index: number) => void;
+  onGateToggle?: (section: SectionData, index: number) => void;
+}
+
+interface TimelineSectionsProps {
+  sections: SectionData[];
+  pixelsPerBeat: number;
+  getActiveBeatInSection: (index: number) => number;
+  handleDragEnd: (from: number, to: number) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+  markUserInteraction: () => void;
+  disableDrag?: boolean;
+  onVelocityDragStart?: (section: SectionData, index: number) => void;
+  onGateToggle?: (section: SectionData, index: number) => void;
+}
+
 // Stable memoized TimelineSections component (defined at module scope to keep identity stable)
 // Track and warn once if sections lack ids to avoid console spam
 let warnedMissingDraggableId = false;
@@ -65,7 +105,7 @@ function SortableSection({
   pixelsPerBeat,
   getActiveBeatInSection,
   markUserInteraction,
-}: any) {
+}: SortableSectionProps) {
   const sectionBeats = section.progression.reduce(
     (s: number, c: any) => s + c.duration,
     0,
@@ -178,7 +218,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
   disableDrag,
   onVelocityDragStart,
   onGateToggle,
-}: any) {
+}: TimelineSectionsProps) {
   const ids = sections.map((s: any) => String(s.id));
 
   const introBufferCards = (
@@ -223,7 +263,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
     </>
   );
 
-  const renderStaticSection = (section: any, index: number, keyOverride?: string) => {
+  const renderStaticSection = (section: SectionData, index: number, keyOverride?: string) => {
     const sectionBeats =
       section?.progression?.reduce((s: number, c: any) => s + c.duration, 0) || 0;
     const sectionWidth = sectionBeats * pixelsPerBeat;
@@ -306,7 +346,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
         onScroll={markUserInteraction}
       >
         {introBufferCards}
-        {sections.map((section: any, index: number) =>
+        {sections.map((section: SectionData, index: number) =>
           renderStaticSection(section, index, `section-static-${index}`),
         )}
         {outroBufferCards}
@@ -325,10 +365,10 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
           return;
         }
         const fromIndex = sections.findIndex(
-          (s: any) => String(s.id) === String(active.id),
+          (s: SectionData) => String(s.id) === String(active.id),
         );
         const toIndex = sections.findIndex(
-          (s: any) => String(s.id) === String(over.id),
+          (s: SectionData) => String(s.id) === String(over.id),
         );
         if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
           handleDragEnd(fromIndex, toIndex);
@@ -346,7 +386,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
         >
           {introBufferCards}
 
-          {sections.map((section: any, index: number) => {
+          {sections.map((section: SectionData, index: number) => {
             if (!section || !section.id) {
               if (!warnedMissingDraggableId) {
                 // eslint-disable-next-line no-console
@@ -396,7 +436,8 @@ export function LoopTimeline() {
   // Ref for scroll container to enable auto-scroll
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Fixed heights for each mode (kept in CSS; removed unused JS map)
+  // Ref for animation frame to manage eased scrolling
+  const animationFrameRef = useRef<number | null>(null);
 
   // Helper to convert MIDI note to name
   // NOTE: midiToNoteName is defined at module scope above; avoid redeclaring here.
@@ -470,19 +511,23 @@ export function LoopTimeline() {
   }, []);
 
   // Velocity and legato controls moved to Zone 3 (ProgressionStrip)
-  
-  const { updateChord } = useProgressionStore();
 
-  // Auto-scroll: center the active beat under the fixed playhead.
-  // Uses requestAnimationFrame to ensure layout is settled before scrolling.
+  // Auto-scroll: center the active beat under the fixed playhead with eased animation.
+  // Uses requestAnimationFrame for smooth easing and respects user interaction.
   useEffect(() => {
     if (
       !scrollContainerRef.current ||
       totalBeats === 0 ||
       !isPlaying ||
       isUserInteracting
-    )
+    ) {
+      // Stop any ongoing animation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
       return;
+    }
 
     const container = scrollContainerRef.current;
     const loopedBeat = currentBeat % totalBeats;
@@ -492,13 +537,32 @@ export function LoopTimeline() {
     const viewportWidth = container.clientWidth;
     const targetScrollLeft = beatPosition - viewportWidth / 2;
 
-    // Use rAF to ensure the DOM has finished layout before assigning scrollLeft.
-    // Without this, the browser may discard the assignment if it happens mid-layout.
-    const frameId = requestAnimationFrame(() => {
-      container.scrollLeft = targetScrollLeft;
-    });
+    // Start eased animation if not already running
+    if (!animationFrameRef.current) {
+      const animate = () => {
+        const currentScroll = container.scrollLeft;
+        const delta = targetScrollLeft - currentScroll;
+        const easeAmount = 0.1; // Adjust for easing speed (lower = smoother/slower)
+        const newScroll = currentScroll + delta * easeAmount;
 
-    return () => cancelAnimationFrame(frameId);
+        container.scrollLeft = newScroll;
+
+        // Continue if not close enough to target
+        if (Math.abs(delta) > 1) {
+          animationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          animationFrameRef.current = null;
+        }
+      };
+      animationFrameRef.current = requestAnimationFrame(animate);
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
   }, [currentBeat, totalBeats, pixelsPerBeat, isPlaying, isUserInteracting]);
 
   // Keyboard shortcuts for timeline: T toggle, Shift+T fullscreen, Esc exit fullscreen, +/- zoom
@@ -579,9 +643,16 @@ export function LoopTimeline() {
         <div
           className="timeline-resize-handle"
           onMouseDown={handlers.onDragStart}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handlers.onDragStart(e as any);
+            }
+          }}
           title="Drag to resize timeline"
           role="button"
           aria-label="Resize timeline"
+          tabIndex={0}
         />
         {isDragging && (
           <div className="resize-tooltip">{Math.round(height)} px</div>
@@ -671,6 +742,8 @@ export function LoopTimeline() {
             <div
               className="playhead-dial"
               data-position={`${currentBar}:${currentBeatInBar}`}
+              aria-live="polite"
+              aria-label={`Playhead at bar ${currentBar}, beat ${currentBeatInBar}`}
             >
             </div>
           </div>

@@ -1,6 +1,6 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useProgressionStore } from "@stores/progressionStore";
-import { Repeat } from "lucide-react";
+import { Repeat, Edit3, Trash2, Copy } from "lucide-react";
 
 export default function SongOverview() {
   const {
@@ -10,7 +10,11 @@ export default function SongOverview() {
     reorderSection,
     duplicateSection,
     deleteSection,
+    renameSectionAt,
   } = useProgressionStore();
+
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const onClickSection = useCallback(
     (i: number) => {
@@ -33,6 +37,23 @@ export default function SongOverview() {
 
   const preventDefault = (e: React.DragEvent) => e.preventDefault();
 
+  const startEdit = (i: number, name: string) => {
+    setEditingIndex(i);
+    setEditValue(name);
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditValue("");
+  };
+
+  const saveEdit = (i: number) => {
+    const name = editValue.trim();
+    if (!name) return;
+    renameSectionAt(i, name);
+    cancelEdit();
+  };
+
   return (
     <div>
       <div className="mb-1 text-xs muted-text">Song Overview</div>
@@ -44,31 +65,34 @@ export default function SongOverview() {
             onDragStart={(e) => handleDragStart(e, i)}
             onDragOver={preventDefault}
             onDrop={(e) => handleDrop(e, i)}
-            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-all ${
-              i === currentSectionIndex ? "bg-orange/10 ring-1 ring-orange" : "hover:bg-black/5"
+            className={`flex items-center justify-between rounded cursor-pointer transition-all ${
+              i === currentSectionIndex ? "bg-orange/10 ring-1 ring-orange p-1" : "hover:bg-black/5 p-1"
             }`}
             onClick={() => onClickSection(i)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              // Simple inline actions via prompt for now
-              const action = window.prompt("Action: rename / dup / del", "");
-              if (!action) return;
-              const a = action.toLowerCase().trim();
-              if (a === "dup" || a === "duplicate") duplicateSection(i);
-              if (a === "del" || a === "delete") deleteSection(i);
-              if (a === "rename") {
-                const name = window.prompt("New name", s.name);
-                if (name) useProgressionStore.getState().renameSection(name);
-              }
-            }}
           >
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded flex items-center justify-center font-mono font-bold text-sm text-black" aria-hidden>
                 {i + 1}
               </div>
-              <div>
-                <div className="font-semibold text-sm">{s.name}</div>
-                <div className="text-xs muted-text">{s.progression.length} chords • {s.progression.reduce((sum, c) => sum + c.duration, 0)} beats</div>
+
+              <div className="min-w-0">
+                {editingIndex === i ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      className="input text-sm" 
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button className="btn-small" onClick={(e) => { e.stopPropagation(); saveEdit(i); }}>Save</button>
+                    <button className="btn-small" onClick={(e) => { e.stopPropagation(); cancelEdit(); }}>Cancel</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="font-semibold text-sm truncate">{s.name}</div>
+                    <div className="text-xs muted-text truncate">{s.progression.length} chords • {s.progression.reduce((sum, c) => sum + c.duration, 0)} beats</div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -76,6 +100,30 @@ export default function SongOverview() {
               <div className="text-xs px-2 py-0.5 rounded bg-black/5 text-black flex items-center gap-1">
                 <Repeat size={12} /> <span className="text-[11px]">{s.repeats || 1}</span>
               </div>
+
+              <button
+                title="Rename"
+                className="btn-icon"
+                onClick={(e) => { e.stopPropagation(); startEdit(i, s.name); }}
+              >
+                <Edit3 size={14} />
+              </button>
+
+              <button
+                title="Duplicate"
+                className="btn-icon"
+                onClick={(e) => { e.stopPropagation(); duplicateSection(i); }}
+              >
+                <Copy size={14} />
+              </button>
+
+              <button
+                title="Delete"
+                className="btn-icon"
+                onClick={(e) => { e.stopPropagation(); deleteSection(i); }}
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           </div>
         ))}

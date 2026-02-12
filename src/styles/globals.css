@@ -69,7 +69,7 @@ body {
   letter-spacing: var(--tracking-normal);
   margin: 0;
   padding: 0;
-  font-family: var(--font-sans);
+    font-family: 'Arial', sans-serif; /* Changed font for better compatibility */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-background);
@@ -1159,3 +1159,173 @@ html.dark .progression-editor-content .btn-label {
     transform: scale(1);
   }
 }
+
+/* Flip card container for contextual navigation drawer */
+.flip-container {
+  perspective: 1200px;
+  width: 100%;
+  height: 100%;
+}
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  -webkit-transform-style: preserve-3d !important;
+  transform-style: preserve-3d !important;
+  -webkit-transition: -webkit-transform 0.6s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1) !important;
+  transform-origin: center center;
+  will-change: transform;
+}
+.flip-container.is-flipped .flip-inner {
+  -webkit-transform: rotateY(180deg) !important;
+  transform: rotateY(180deg) !important;
+}
+
+/* Compact left menu: reduce padding/gaps to avoid scrollbars */
+.menu-compact {
+  font-size: 12px;
+}
+.menu-compact .muted-text {
+  font-size: 11px;
+}
+.menu-compact .grid {
+  gap: 0.25rem !important;
+}
+.menu-compact .grid.grid-cols-2 > button,
+.menu-compact button.btn-muted {
+  padding: 0.28rem 0.45rem !important;
+  font-size: 0.75rem !important;
+  min-width: 0 !important;
+}
+.menu-compact .flex.gap-1 > button,
+.menu-compact .flex.gap-1 > .px-2 {
+  padding: 0.18rem 0.35rem !important;
+  font-size: 0.72rem !important;
+}
+.menu-compact .quick-sections {
+  display: flex;
+  gap: 0.25rem;
+  padding-top: 0.25rem;
+}
+.menu-compact .quick-sections button {
+  padding: 0.18rem 0.3rem !important;
+  font-size: 0.72rem !important;
+  min-width: 2.2rem !important;
+}
+.menu-compact .card,
+.menu-compact .panel {
+  padding: 0.25rem !important;
+}
+.menu-compact .btn-muted {
+  border-radius: 6px !important;
+}
+
+/* Extra-compact styling for the flip-back contextual panel (make settings much smaller) */
+.flip-back,
+.flip-back * {
+  font-size: 0.62rem !important; /* make much smaller so lines fit */
+}
+.flip-back .text-sm {
+  font-size: 0.66rem !important;
+}
+.flip-back .muted-text {
+  font-size: 0.64rem !important;
+}
+.flip-back .space-y-2 > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.flip-back input,
+.flip-back select,
+.flip-back textarea {
+  padding: 0.12rem 0.2rem !important;
+  font-size: 0.62rem !important;
+  border-radius: 6px !important;
+}
+.flip-back button,
+.flip-back .btn-muted,
+.flip-back .btn-small {
+  padding: 0.12rem 0.26rem !important;
+  font-size: 0.62rem !important;
+  line-height: 1 !important;
+}
+.flip-back .card,
+.flip-back .panel {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.flip-back .quick-sections {
+  gap: 0.25rem !important;
+}
+.flip-back .tools-panel * {
+  font-size: 0.62rem !important;
+}
+
+/* Force compact grids inside flip-back */
+.flip-back .grid {
+  gap: 0.25rem !important;
+}
+
+/* Ensure long text fits: cap widths, allow wrapping, and truncate where necessary */
+.flip-back {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Override Tailwind `p-2` used inside the flip-back markup so content sits flush */
+.flip-back .p-2 {
+  padding: 0 !important;
+}
+.flip-back label,
+.flip-back .text-sm,
+.flip-back .muted-text,
+.flip-back .card-title,
+.flip-back .panel-title,
+.flip-back button {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flip-front,
+.flip-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-front {
+  transform: rotateY(0deg);
+}
+.flip-back {
+  transform: rotateY(180deg);
+  background: rgba(0,0,0,0.06);
+  backdrop-filter: blur(4px);
+  padding: 0 !important;
+  box-sizing: border-box;
+  overflow: auto; /* allow scrolling when content exceeds panel height */
+  -webkit-overflow-scrolling: touch;
+}
+
+.flip-back:focus {
+  outline: none;
+}
+
+/* Subtle shadow to give the flip card visual depth */
+.flip-front,
+.flip-back {
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+/* Slightly stronger shadow while flipped to accentuate the back face */
+.flip-container.is-flipped .flip-inner {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+/* Menu visual effects removed (reverted per user request) */
+

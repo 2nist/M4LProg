@@ -50,6 +50,12 @@ interface ProgressionState {
   /** Get current section */
   getCurrentSection: () => Section;
 
+  /** UI: currently open left drawer (null | 'sections' | 'patterns' | 'settings' | 'library') */
+  openDrawer: string | null;
+
+  /** Open a named drawer */
+  setOpenDrawer: (name: string | null) => void;
+
   /** Load a section by index */
   loadSection: (index: number) => void;
 
@@ -67,6 +73,8 @@ interface ProgressionState {
 
   /** Rename current section */
   renameSection: (name: string) => void;
+  /** Rename a section by index */
+  renameSectionAt: (index: number, name: string) => void;
 
   /** Reorder a section (drag/drop or keyboard) */
   reorderSection: (fromIndex: number, toIndex: number) => void;
@@ -185,6 +193,12 @@ export const useProgressionStore = create<ProgressionState>()(
         return sections[currentSectionIndex] || sections[0];
       },
 
+      // Left drawer UI state
+      openDrawer: null,
+      setOpenDrawer: (name: string | null) => {
+        set(() => ({ openDrawer: name }));
+      },
+
       loadSection: (index: number) => {
         const { sections } = get();
         if (index >= 0 && index < sections.length) {
@@ -244,6 +258,14 @@ export const useProgressionStore = create<ProgressionState>()(
           ...newSections[currentSectionIndex],
           name,
         };
+        set({ sections: newSections });
+      },
+
+      renameSectionAt: (index: number, name: string) => {
+        const { sections } = get();
+        if (index < 0 || index >= sections.length) return;
+        const newSections = [...sections];
+        newSections[index] = { ...newSections[index], name };
         set({ sections: newSections });
       },
 
