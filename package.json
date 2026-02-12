@@ -27,7 +27,9 @@
     "test": "vitest",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "storybook:run": "npx storybook@next dev -p 6006"
+    "storybook:run": "npx storybook@next dev -p 6006",
+    "extract": "node tools/extract/extract.js",
+    "extract:strategy": "node tools/extract/extract.js c:/Users/CraftAuto-Sales/Downloads/M4LProg_Extraction_Strategy.md --out tools/extract/out/strategy-outline.json"
   },
   "keywords": [],
   "author": "",
