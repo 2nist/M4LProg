@@ -5,6 +5,14 @@
 
 import { OSC_ADDRESSES, OSCNote } from "../../types/osc";
 
+// Transport abstraction to decouple from window.electronAPI
+export interface OSCTransport {
+  sendOSC: (address: string, args: any[]) => Promise<void> | void;
+  onOSCMessage: (cb: (message: any) => void) => void;
+}
+
+let injectedTransport: OSCTransport | null = null;
+
 // Message handlers storage
 let messageHandlers: Map<string, ((msg: any) => void)[]> = new Map();
 let isInitialized = false;
@@ -13,6 +21,7 @@ let isInitialized = false;
  * Initialize OSC communication
  */
 export async function initializeOSC(
+  transport?: OSCTransport | null,
   _sendPort: number = 11000,
   _receivePort: number = 11001,
 ): Promise<boolean> {
@@ -21,13 +30,20 @@ export async function initializeOSC(
   }
 
   try {
-    // Set up message receiver from main process
-    window.electronAPI.onOSCMessage((message: any) => {
-      handleIncomingMessage(message);
-    });
+    // If a transport was provided, store it and use it, otherwise fallback to window.electronAPI
+    if (transport) {
+      injectedTransport = transport;
+      injectedTransport.onOSCMessage((message: any) => handleIncomingMessage(message));
+      await injectedTransport.sendOSC("/chordgen/initialize", []);
+    } else {
+      // Set up message receiver from main process
+      window.electronAPI.onOSCMessage((message: any) => {
+        handleIncomingMessage(message);
+      });
 
-    // Initialize in main process
-    await window.electronAPI.sendOSC("/chordgen/initialize", []);
+      // Initialize in main process
+      await window.electronAPI.sendOSC("/chordgen/initialize", []);
+    }
 
     isInitialized = true;
     console.log("[OSC Renderer] Initialized successfully");
@@ -108,7 +124,11 @@ function sendOSCMessage(address: string, args: any): void {
 
   try {
     const argsArray = Array.isArray(args) ? args : [args];
-    window.electronAPI.sendOSC(address, argsArray);
+    if (injectedTransport) {
+      injectedTransport.sendOSC(address, argsArray);
+    } else {
+      window.electronAPI.sendOSC(address, argsArray);
+    }
   } catch (error) {
     console.error("[OSC Renderer] Send failed:", error);
   }
@@ -222,7 +242,11 @@ export function playChord(
 export function closeOSC(): void {
   if (isInitialized) {
     try {
-      window.electronAPI.sendOSC("/chordgen/close", []);
+      if (injectedTransport) {
+        injectedTransport.sendOSC("/chordgen/close", []);
+      } else {
+        window.electronAPI.sendOSC("/chordgen/close", []);
+      }
       isInitialized = false;
       messageHandlers.clear();
       console.log("[OSC Renderer] Connection closed");

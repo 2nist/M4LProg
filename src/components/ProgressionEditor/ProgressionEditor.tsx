@@ -140,7 +140,7 @@ export function ProgressionEditor() {
   } = useProgressionStore();
   const { openDrawer, setOpenDrawer } = useProgressionStore();
 
-  const { initializeMIDI, isConnected } = useHardwareStore();
+  const { initializeMIDI } = useHardwareStore();
 
   // Encoder staging state (current chord being built)
   const [encoderState, setEncoderState] = useState({
@@ -352,40 +352,7 @@ export function ProgressionEditor() {
     };
   }, [encoderState]);
 
-  // Get chord display name
-  const getChordDisplayName = useCallback(() => {
-    const { keyRoot, mode, degree, quality, extension } = encoderState;
-
-    if (degree === 0) {
-      // Free mode
-      const noteName = NOTE_NAMES[keyRoot % 12];
-      let qualityStr = quality;
-
-      if (extension > 0) {
-        qualityStr = MusicTheory.extendChordQuality(
-          quality,
-          extension as 7 | 9 | 11 | 13,
-        );
-      }
-
-      return `${noteName}${qualityStr}`;
-    } else {
-      // Diatonic mode
-      const romanNumeral = MusicTheory.getRomanNumeral(degree, mode);
-      const chordRoot = MusicTheory.getScaleDegreeRoot(keyRoot, degree, mode);
-      const noteName = NOTE_NAMES[chordRoot % 12];
-      let chordQuality = MusicTheory.getDiatonicQuality(degree, mode);
-
-      if (extension > 0) {
-        chordQuality = MusicTheory.extendChordQuality(
-          chordQuality,
-          extension as 7 | 9 | 11 | 13,
-        );
-      }
-
-      return `${romanNumeral} (${noteName}${chordQuality})`;
-    }
-  }, [encoderState]);
+  // (getChordDisplayName removed — unused)
 
   // Get pad semantic class based on chord quality
   const getPadColor = useCallback((quality?: ChordQuality) => {

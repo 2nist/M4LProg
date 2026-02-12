@@ -4,6 +4,9 @@ import { useLiveStore } from "../stores/liveStore";
 interface UsePlayheadSyncOpts {
   pixelsPerBeat?: number;
   totalBeats?: number;
+  // Optional transport injection to make this hook store-agnostic
+  transport?: { currentBeat: number; isPlaying: boolean; tempo?: number } | null;
+  isConnected?: boolean | null;
 }
 
 type MockSnapshot = { playing: boolean; beat: number };
@@ -24,9 +27,12 @@ function publishMock() {
 export function usePlayheadSync(opts: UsePlayheadSyncOpts = {}) {
   const { pixelsPerBeat = 40, totalBeats = 0 } = opts;
 
-  // Subscribe to live store transport and connection status
-  const transport = useLiveStore((s: any) => s.transport);
-  const isConnected = useLiveStore((s: any) => s.isConnected);
+  // Subscribe to live store transport and connection status (used if not injected)
+  const storeTransport = useLiveStore((s: any) => s.transport);
+  const storeIsConnected = useLiveStore((s: any) => s.isConnected);
+
+  const transport = opts.transport ?? storeTransport;
+  const isConnected = opts.isConnected ?? storeIsConnected;
 
   const [mockState, setMockState] = useState<MockSnapshot>({
     playing: mockClock.playing,
@@ -71,7 +77,7 @@ export function usePlayheadSync(opts: UsePlayheadSyncOpts = {}) {
       mockClock.lastTime = time;
 
       // tempo is beats per minute
-      const tempo = useLiveStore.getState().transport?.tempo || 120;
+      const tempo = opts.transport?.tempo ?? useLiveStore.getState().transport?.tempo ?? 120;
       const beatsPerMs = tempo / 60000; // beats per millisecond
       const deltaBeats = dt * beatsPerMs;
 

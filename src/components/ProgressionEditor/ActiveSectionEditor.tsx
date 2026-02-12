@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import type { TransitionType } from "../../types/progression";
 import { useProgressionStore } from "@stores/progressionStore";
 import { Plus, Copy, Trash2 } from "lucide-react";
 
@@ -18,13 +19,13 @@ export default function ActiveSectionEditor() {
   const [name, setName] = useState(section.name || "");
   const [repeats, setRepeats] = useState(section.repeats || 1);
   const [beatsPerBar, setBeatsPerBar] = useState(section.beatsPerBar || 4);
-  const [transition, setTransition] = useState(section.transition || "none");
+  const [transitionType, setTransitionType] = useState(section.transitions?.type || "none");
 
   useEffect(() => {
     setName(section.name || "");
     setRepeats(section.repeats || 1);
     setBeatsPerBar(section.beatsPerBar || 4);
-    setTransition(section.transition || "none");
+    setTransitionType(section.transitions?.type || "none");
   }, [section, currentSectionIndex]);
 
   const save = () => {
@@ -33,7 +34,10 @@ export default function ActiveSectionEditor() {
       name,
       repeats: Number(repeats),
       beatsPerBar: Number(beatsPerBar),
-      transition,
+      transitions: {
+        ...(section.transitions || { length: 1 }),
+        type: transitionType,
+      },
     };
     updateCurrentSection(updated);
     renameSection(name);
@@ -88,13 +92,13 @@ export default function ActiveSectionEditor() {
           <label className="text-[10px] muted-text block mb-1">Transition</label>
           <select
             className="w-full h-8 text-xs compact"
-            value={transition}
-            onChange={(e) => setTransition(e.target.value)}
+            value={transitionType}
+            onChange={(e) => setTransitionType(e.target.value as TransitionType)}
             onBlur={save}
           >
             <option value="none">None</option>
-            <option value="smooth">Smooth</option>
-            <option value="jump">Jump</option>
+            <option value="backdoor_dominant">Backdoor Dominant</option>
+            <option value="plagal">Plagal</option>
           </select>
         </div>
 

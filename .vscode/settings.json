@@ -25,5 +25,6 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "amplicode.server.tsConfig": "./tsconfig.node.json"
+  "amplicode.server.tsConfig": "./tsconfig.node.json",
+  "git.ignoreLimitWarning": true
 }

@@ -76,7 +76,7 @@ export default function ProgressionStrip(props: Props) {
   const selected = selectedSlot ?? selectedSlotIndex ?? null;
 
   const [zoom, setZoom] = useState(0.45);
-  const [fitToView, setFitToView] = useState(true); // Default to fit-to-view to avoid scrolling
+  const [fitToView, _setFitToView] = useState(true); // Default to fit-to-view to avoid scrolling
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -99,7 +99,7 @@ export default function ProgressionStrip(props: Props) {
     [progression],
   );
 
-  const beatsPerBar = section?.beatsPerBar || 4;
+  
 
   // measure container width
   useEffect(() => {

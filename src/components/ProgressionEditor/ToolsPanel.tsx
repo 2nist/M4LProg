@@ -1,4 +1,3 @@
-import React from "react";
 import ActiveSectionEditor from "./ActiveSectionEditor";
 import SongSettings from "./SongSettings";
 

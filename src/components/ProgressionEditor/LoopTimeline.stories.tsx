@@ -6,17 +6,15 @@ import { useEffect } from 'react';
 
 // Wrapper component that accepts props and sets store state
 const LoopTimelineWrapper = ({
-  zoomLevel = 0.45,
   tempo = 120,
   isPlaying = false,
   currentBeat = 0,
-  sections = mockSections
+  sections,
 }: {
-  zoomLevel?: number;
   tempo?: number;
   isPlaying?: boolean;
   currentBeat?: number;
-  sections?: any[];
+  sections: any[];
 }) => {
   useEffect(() => {
     // Set progression store state
@@ -95,20 +93,7 @@ const mockSectionsComplex = [
   },
 ];
 
-// Mock store setup for Storybook
-const mockProgressionStore = (sections: any[]) => {
-  const useStore = useProgressionStore;
-  useStore.setState({ sections });
-};
-
-const mockLiveStore = (overrides: Partial<ReturnType<typeof useLiveStore.getState>> = {}) => {
-  const useStore = useLiveStore;
-  useStore.setState({
-    isConnected: true,
-    transport: { isPlaying: false, currentBeat: 0, tempo: 120 },
-    ...overrides,
-  });
-};
+// (store initialization is done directly in the wrapper)
 
 export default {
   title: 'ProgressionEditor/LoopTimeline',
@@ -157,7 +142,6 @@ type Story = StoryObj<typeof LoopTimelineWrapper>;
 export const Default: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.45,
     tempo: 120,
     isPlaying: false,
     currentBeat: 0,
@@ -167,7 +151,6 @@ export const Default: Story = {
 export const Playing: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.45,
     tempo: 120,
     isPlaying: true,
     currentBeat: 3.5,
@@ -177,7 +160,6 @@ export const Playing: Story = {
 export const HighZoom: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.8,
     tempo: 120,
     isPlaying: false,
     currentBeat: 0,
@@ -192,7 +174,6 @@ export const HighZoom: Story = {
 export const LowZoom: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.1,
     tempo: 120,
     isPlaying: false,
     currentBeat: 0,
@@ -207,7 +188,6 @@ export const LowZoom: Story = {
 export const WithActiveBeat: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.45,
     tempo: 120,
     isPlaying: false,
     currentBeat: 2.5,
@@ -222,7 +202,6 @@ export const WithActiveBeat: Story = {
 export const ComplexProgression: Story = {
   args: {
     sections: mockSectionsComplex,
-    zoomLevel: 0.35,
     tempo: 120,
     isPlaying: false,
     currentBeat: 0,
@@ -237,7 +216,6 @@ export const ComplexProgression: Story = {
 export const Playground: Story = {
   args: {
     sections: mockSectionsComplex,
-    zoomLevel: 0.5,
     tempo: 140,
     isPlaying: true,
     currentBeat: 8.75,
@@ -252,7 +230,6 @@ export const Playground: Story = {
 export const ExtremeZoom: Story = {
   args: {
     sections: mockSections,
-    zoomLevel: 0.95,
     tempo: 200,
     isPlaying: true,
     currentBeat: 1.25,
@@ -267,7 +244,6 @@ export const ExtremeZoom: Story = {
 export const WideView: Story = {
   args: {
     sections: mockSectionsComplex,
-    zoomLevel: 0.05,
     tempo: 80,
     isPlaying: false,
     currentBeat: 0,

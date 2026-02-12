@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useProgressionStore } from "@stores/progressionStore";
 import { useHardwareStore } from "@stores/hardwareStore";
 
@@ -16,7 +16,7 @@ export default function SongSettings() {
       return;
     }
 
-    saveProgression(title, { tempo, timeSignature: timeSig, key: keyRoot });
+    saveProgression(title, { tempo, key: String(keyRoot) });
     alert("Saved progression: " + title);
   };
 

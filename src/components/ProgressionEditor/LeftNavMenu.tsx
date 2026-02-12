@@ -1,4 +1,3 @@
-import React from "react";
 import { useProgressionStore } from "@stores/progressionStore";
 
 export default function LeftNavMenu() {
@@ -44,7 +43,7 @@ export default function LeftNavMenu() {
 
       <div className="mt-3 text-xs muted-text">Quick Sections</div>
       <div className="flex gap-1 overflow-x-auto py-1">
-        {sections.slice(0, 8).map((s, i) => (
+        {sections.slice(0, 8).map((s) => (
           <button key={s.id} className="px-2 py-1 rounded bg-black/5 text-sm">
             {s.name}
           </button>

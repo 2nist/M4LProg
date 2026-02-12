@@ -3,6 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import * as HardwareService from "../services/hardware/HardwareService";
 import { useProgressionStore } from "./progressionStore";
 import { WebMidi } from "webmidi";
+import type { Chord } from "../types/chord";
 
 interface HardwareState {
   // Connection state
@@ -110,12 +111,12 @@ export const useHardwareStore = create<HardwareState>()(
             // Auto-create a default chord if progression is empty
             if (!chord) {
               console.log('✨ Creating default C major chord for hardware control');
-              const defaultChord = {
+              const defaultChord: Chord = {
                 notes: [60, 64, 67], // C major triad (C4, E4, G4)
                 duration: 4, // 4 beats (whole note)
                 metadata: {
                   root: 60,
-                  quality: 'major',
+                  quality: 'Maj', // use `ChordQuality` literal
                   velocities: [100, 100, 100],
                   gate: [1, 1, 1],
                   strum: [0, 0, 0],
