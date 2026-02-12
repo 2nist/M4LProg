@@ -1,10 +1,10 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { LoopTimeline } from '../../src/components/ProgressionEditor/LoopTimeline';
+import { LoopTimeline } from '@components/ProgressionEditor/LoopTimeline';
 
 // Mock dependencies
-vi.mock('../../src/stores/progressionStore', () => ({
+vi.mock('@stores/progressionStore', () => ({
   useProgressionStore: vi.fn(() => ({
     sections: [
       {
@@ -21,7 +21,7 @@ vi.mock('../../src/stores/progressionStore', () => ({
   })),
 }));
 
-vi.mock('../../src/stores/liveStore', () => ({
+vi.mock('@stores/liveStore', () => ({
   useLiveStore: vi.fn(() => ({
     play: vi.fn(),
     pause: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../../src/stores/liveStore', () => ({
   })),
 }));
 
-vi.mock('../../src/hooks/useExpandableTimeline', () => ({
+vi.mock('@hooks/useExpandableTimeline', () => ({
   useExpandableTimeline: vi.fn(() => ({
     mode: 'normal',
     height: 200,
@@ -42,7 +42,7 @@ vi.mock('../../src/hooks/useExpandableTimeline', () => ({
   })),
 }));
 
-vi.mock('../../src/hooks/usePlayheadSync', () => ({
+vi.mock('@hooks/usePlayheadSync', () => ({
   default: vi.fn(() => ({
     currentBeat: 2,
     isPlaying: true,

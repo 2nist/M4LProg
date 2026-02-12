@@ -87,44 +87,30 @@
   width: 100%;
   min-height: 120px;
 
-  /* Layered background: texture + cylindrical gradient + vertical vignette */
+  /* Baseline cylinder: texture + pure side darkening (no top-to-bottom variance) */
   background-image: 
     /* Paper texture */
     url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Cfilter id="noise"%3E%3CfeTurbulence baseFrequency="0.9" numOctaves="4"/%3E%3C/filter%3E%3Crect width="200" height="200" filter="url(%23noise)" opacity="0.03"/%3E%3C/svg%3E'),
-    /* Vertical vignette (cylinder curves away from viewer at top and bottom) */
     linear-gradient(
-        180deg,
-        rgba(0, 0, 0, 0.55) 0%,
-        rgba(0, 0, 0, 0.25) 12%,
-        transparent 30%,
-        transparent 70%,
-        rgba(0, 0, 0, 0.25) 88%,
-        rgba(0, 0, 0, 0.55) 100%
-      ),
-    /* Left edge shadow — extended reach for symmetrical cylinder curvature */
+      90deg,
+      rgba(0, 0, 0, 0.88) 0%,
+      rgba(0, 0, 0, 0.70) 5%,
+      rgba(0, 0, 0, 0.48) 12%,
+      rgba(0, 0, 0, 0.28) 22%,
+      rgba(0, 0, 0, 0.12) 34%,
+      rgba(0, 0, 0, 0.04) 46%,
+      transparent 58%
+    ),
     linear-gradient(
-        90deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 0.90) 3%,
-        rgba(0, 0, 0, 0.70) 8%,
-        rgba(0, 0, 0, 0.50) 16%,
-        rgba(0, 0, 0, 0.32) 28%,
-        rgba(0, 0, 0, 0.18) 42%,
-        rgba(0, 0, 0, 0.08) 55%,
-        transparent 68%
-      ),
-    /* Right edge shadow — extended reach for symmetrical cylinder curvature */
-    linear-gradient(
-        270deg,
-        rgba(0, 0, 0, 1) 0%,
-        rgba(0, 0, 0, 0.90) 3%,
-        rgba(0, 0, 0, 0.70) 8%,
-        rgba(0, 0, 0, 0.50) 16%,
-        rgba(0, 0, 0, 0.32) 28%,
-        rgba(0, 0, 0, 0.18) 42%,
-        rgba(0, 0, 0, 0.08) 55%,
-        transparent 68%
-      );
+      270deg,
+      rgba(0, 0, 0, 0.88) 0%,
+      rgba(0, 0, 0, 0.70) 5%,
+      rgba(0, 0, 0, 0.48) 12%,
+      rgba(0, 0, 0, 0.28) 22%,
+      rgba(0, 0, 0, 0.12) 34%,
+      rgba(0, 0, 0, 0.04) 46%,
+      transparent 58%
+    );
 
   /* Uniform paper color (no horizontal variation - cylinder effect from edge shadows only) */
   background-color: var(--timeline-paper-base);
@@ -135,10 +121,8 @@
 
   /* Depth with inner shadows - pronounced top shadow for depth */
   box-shadow:
-    inset 0 12px 24px rgba(0, 0, 0, 0.45),
-    inset 0 6px 12px rgba(0, 0, 0, 0.30),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.35),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.20);
+    inset 0 1px 0 rgba(255, 236, 196, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.34);
 
   /* Scrollable track — NO scroll-behavior:smooth or scroll-snap here.
      Both fight programmatic scrollLeft assignments from auto-scroll. */
@@ -148,6 +132,43 @@
   /* Hide scrollbar for cleaner look */
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+.timeline-track::before,
+.timeline-track::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Soft top cast shadow from timeline nav strip */
+.timeline-track::before {
+  top: 0;
+  height: 12px;
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.14) 58%,
+      transparent 100%
+    );
+}
+
+/* Soft bottom cast shadow from controls panel */
+.timeline-track::after {
+  bottom: 0;
+  height: 10px;
+  background:
+    linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.22) 0%,
+      rgba(0, 0, 0, 0.08) 44%,
+      rgba(0, 0, 0, 0.03) 70%,
+      transparent 100%
+    );
 }
 
 .timeline-track::-webkit-scrollbar {
@@ -253,10 +274,12 @@
   border-radius: 6px;
   overflow: hidden;
 
-  /* Card lift shadow - floats above cylinder surface */
+  /* Embedded shadow - card sits into the cylinder surface */
   box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.15),
-    0 1px 3px rgba(0, 0, 0, 0.10);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 10px 14px rgba(0, 0, 0, 0.14),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.10),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
 
   cursor: pointer;
   user-select: none;
@@ -272,11 +295,11 @@
   background:
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.18) 0%,
-      rgba(255, 255, 255, 0.12) 20%,
-      rgba(255, 255, 255, 0.18) 50%,
-      rgba(255, 255, 255, 0.06) 80%,
-      rgba(0, 0, 0, 0.15) 100%
+      rgba(0, 0, 0, 0.22) 0%,
+      rgba(255, 255, 255, 0.05) 20%,
+      rgba(255, 255, 255, 0.07) 48%,
+      rgba(255, 255, 255, 0.03) 76%,
+      rgba(0, 0, 0, 0.22) 100%
     );
   z-index: 0;
   pointer-events: none;
@@ -296,7 +319,7 @@
 /* Section header - name only in normal view */
 .section-header {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
@@ -308,6 +331,36 @@
   color: rgba(0, 0, 0, 0.9);
   letter-spacing: 0.3px;
   text-align: center;
+}
+
+/* Section controls */
+.section-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.edit-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  color: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.8);
+}
+
+.edit-btn svg {
+  flex-shrink: 0;
 }
 
 /* Section beat count */
@@ -343,13 +396,16 @@
   align-items: stretch;
   justify-content: flex-start;
   padding: 0;
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.07);
   border: 1px solid rgba(0, 0, 0, 0.15);
   border-radius: 4px;
   min-width: 30px;
   overflow: hidden;
   height: 80px;
   cursor: context-menu; /* Indicate right-click for velocity drawer */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.14);
 }
 
 /* Beat boxes at top of chord card for legato control */
@@ -963,7 +1019,10 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.3);
   position: relative;
   z-index: 10;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 5px 12px rgba(0, 0, 0, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10);
   min-height: 40px;
   max-height: 40px;
   justify-content: space-between;
@@ -1073,6 +1132,9 @@
   max-height: 36px;
   overflow: hidden;
   flex-shrink: 0;
+  box-shadow:
+    0 -4px 10px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
 .control-group {

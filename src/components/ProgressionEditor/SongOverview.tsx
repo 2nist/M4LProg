@@ -60,7 +60,7 @@ export default function SongOverview() {
       <div className="flex flex-col gap-1">
         {sections.map((s, i) => (
           <div
-            key={s.id}
+            key={s.id || `section-${i}`}
             draggable
             onDragStart={(e) => handleDragStart(e, i)}
             onDragOver={preventDefault}

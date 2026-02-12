@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as OSCService from '../../src/services/live/OSCService';
-import { useLiveStore } from '../../src/stores/liveStore';
-import { OSC_ADDRESSES } from '../../src/types/osc';
+import * as OSCService from '@services/live/OSCService';
+import { useLiveStore } from '@stores/liveStore';
+import { OSC_ADDRESSES } from '@types/osc';
 
 // Mock the OSC library (for main process, though we test renderer)
 vi.mock('osc', () => ({

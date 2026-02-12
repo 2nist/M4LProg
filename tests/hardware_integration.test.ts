@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useHardwareStore } from '../../src/stores/hardwareStore';
+import { useHardwareStore } from '@stores/hardwareStore';
 
 // Mock WebMidi
 vi.mock('webmidi', () => ({
@@ -13,7 +13,7 @@ vi.mock('webmidi', () => ({
 }));
 
 // Mock HardwareService
-vi.mock('../../src/services/hardware/HardwareService', () => ({
+vi.mock('@services/hardware/HardwareService', () => ({
   initializeMIDIAccess: vi.fn().mockResolvedValue(true),
   initializeNativeMode: vi.fn(),
   setupMIDIInput: vi.fn(),

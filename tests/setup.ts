@@ -7,17 +7,17 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 }
-global.localStorage = localStorageMock
+(globalThis as any).localStorage = localStorageMock
 
 // Mock requestAnimationFrame
-global.requestAnimationFrame = vi.fn((cb) => {
+;(globalThis as any).requestAnimationFrame = vi.fn((cb) => {
   cb(0)
   return 1
 })
-global.cancelAnimationFrame = vi.fn()
+;(globalThis as any).cancelAnimationFrame = vi.fn()
 
 // Mock window object for node environment
-global.window = {
+;(globalThis as any).window = {
   electronAPI: {
     onOSCMessage: vi.fn(),
     sendOSC: vi.fn(),
@@ -33,7 +33,7 @@ const mockElectronAPI = {
 }
 
 // Mock window.electronAPI
-Object.defineProperty(window, 'electronAPI', {
+Object.defineProperty((globalThis as any).window, 'electronAPI', {
   value: mockElectronAPI,
   writable: true,
 })

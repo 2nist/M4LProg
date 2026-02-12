@@ -20,7 +20,8 @@ import {
   Minimize2,
   Square,
   Maximize2,
-  Maximize
+  Maximize,
+  Edit
 } from "lucide-react";
 import { DndContext, DragEndEvent, closestCenter } from "@dnd-kit/core";
 import {
@@ -177,6 +178,11 @@ function SortableSection({
 
         <div className="section-header">
           <span className="section-name">{section.name}</span>
+          <div className="section-controls">
+            <button className="edit-btn" title="Edit section">
+              <Edit size={12} />
+            </button>
+          </div>
         </div>
 
         <div className="progression-chords">
@@ -277,6 +283,11 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
         <div className="section-card-content">
           <div className="section-header">
             <span className="section-name">{section?.name || "Unnamed"}</span>
+            <div className="section-controls">
+              <button className="edit-btn" title="Edit section">
+                <Edit size={12} />
+              </button>
+            </div>
           </div>
 
           <div className="progression-chords">

@@ -137,18 +137,25 @@ export function updateDisplay(
 
   let textBytes: number[];
   if (Array.isArray(content)) {
-    textBytes = content;
+    textBytes = content.map(b => Math.min(127, Math.max(0, b)));
   } else {
     textBytes = to7BitAscii(content);
   }
 
+  // Clamp all RGB values to 7-bit range (0-127)
+  const safeRgb: [number, number, number] = [
+    Math.min(127, Math.max(0, rgb[0])),
+    Math.min(127, Math.max(0, rgb[1])),
+    Math.min(127, Math.max(0, rgb[2])),
+  ];
+
   const alignment = 0x01; // Center
   const msg = [
     ...SYSEX_HEADER,
-    line,
-    rgb[0],
-    rgb[1],
-    rgb[2],
+    Math.min(127, Math.max(0, line)),
+    safeRgb[0],
+    safeRgb[1],
+    safeRgb[2],
     alignment,
     ...textBytes,
     0xf7,
