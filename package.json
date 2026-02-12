@@ -1,6 +1,10 @@
 {
   "name": "m4lprog",
   "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "description": "",
   "main": "electron/main.ts",
   "directories": {
@@ -20,6 +24,11 @@
     "webmidi": "^3.1.14",
     "zustand": "^5.0.11"
   },
+  "workspaceDependencies": [
+    "@2nist/music-theory",
+    "@2nist/progression",
+    "@2nist/ui-hooks"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
