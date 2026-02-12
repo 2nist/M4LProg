@@ -1,9 +1,24 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLiveStore } from "../stores/liveStore";
 
 interface UsePlayheadSyncOpts {
   pixelsPerBeat?: number;
   totalBeats?: number;
+}
+
+type MockSnapshot = { playing: boolean; beat: number };
+
+const mockClock = {
+  playing: false,
+  beat: 0,
+  rafId: null as number | null,
+  lastTime: null as number | null,
+  listeners: new Set<(snapshot: MockSnapshot) => void>(),
+};
+
+function publishMock() {
+  const snapshot = { playing: mockClock.playing, beat: mockClock.beat };
+  mockClock.listeners.forEach((listener) => listener(snapshot));
 }
 
 export function usePlayheadSync(opts: UsePlayheadSyncOpts = {}) {
@@ -13,60 +28,72 @@ export function usePlayheadSync(opts: UsePlayheadSyncOpts = {}) {
   const transport = useLiveStore((s: any) => s.transport);
   const isConnected = useLiveStore((s: any) => s.isConnected);
 
-  // Mock clock state for offline/dev mode
-  const [mockPlaying, setMockPlaying] = useState(false);
-  const [mockBeat, setMockBeat] = useState<number>(0);
+  const [mockState, setMockState] = useState<MockSnapshot>({
+    playing: mockClock.playing,
+    beat: mockClock.beat,
+  });
 
-  const rafRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number | null>(null);
+  useEffect(() => {
+    const listener = (snapshot: MockSnapshot) => {
+      setMockState(snapshot);
+    };
+    mockClock.listeners.add(listener);
+    listener({ playing: mockClock.playing, beat: mockClock.beat });
+    return () => {
+      mockClock.listeners.delete(listener);
+    };
+  }, []);
 
   const stopMock = useCallback(() => {
-    setMockPlaying(false);
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+    mockClock.playing = false;
+    if (mockClock.rafId) {
+      cancelAnimationFrame(mockClock.rafId);
+      mockClock.rafId = null;
     }
-    lastTimeRef.current = null;
+    mockClock.lastTime = null;
+    publishMock();
   }, []);
 
   const startMock = useCallback(() => {
     if (isConnected) return; // don't start mock when connected
-    setMockPlaying(true);
+    mockClock.playing = true;
+    publishMock();
 
-    if (rafRef.current) return; // already running
+    if (mockClock.rafId) return; // already running
 
     const step = (time: number) => {
-      if (lastTimeRef.current == null) lastTimeRef.current = time;
-      const dt = time - lastTimeRef.current; // ms
-      lastTimeRef.current = time;
+      if (!mockClock.playing) {
+        mockClock.rafId = null;
+        return;
+      }
+      if (mockClock.lastTime == null) mockClock.lastTime = time;
+      const dt = time - mockClock.lastTime; // ms
+      mockClock.lastTime = time;
 
       // tempo is beats per minute
-      const tempo = transport?.tempo || 120;
+      const tempo = useLiveStore.getState().transport?.tempo || 120;
       const beatsPerMs = tempo / 60000; // beats per millisecond
       const deltaBeats = dt * beatsPerMs;
 
-      setMockBeat((b) => {
-        const next = b + deltaBeats;
-        if (totalBeats > 0) return next % totalBeats;
-        return next;
-      });
+      mockClock.beat += deltaBeats;
+      publishMock();
 
-      rafRef.current = requestAnimationFrame(step);
+      mockClock.rafId = requestAnimationFrame(step);
     };
 
-    rafRef.current = requestAnimationFrame(step);
-  }, [isConnected, transport, totalBeats]);
+    mockClock.rafId = requestAnimationFrame(step);
+  }, [isConnected]);
 
   // Stop mock if connection becomes live
   useEffect(() => {
-    if (isConnected && mockPlaying) {
+    if (isConnected && mockState.playing) {
       stopMock();
     }
-  }, [isConnected, mockPlaying, stopMock]);
+  }, [isConnected, mockState.playing, stopMock]);
 
   // Expose current beat and playing status
-  const currentBeat = isConnected ? transport.currentBeat : mockBeat;
-  const isPlaying = isConnected ? transport.isPlaying : mockPlaying;
+  const currentBeat = isConnected ? transport.currentBeat : mockState.beat;
+  const isPlaying = isConnected ? transport.isPlaying : mockState.playing;
 
   const playheadX =
     totalBeats > 0
@@ -79,7 +106,7 @@ export function usePlayheadSync(opts: UsePlayheadSyncOpts = {}) {
     playheadX,
     startMock,
     stopMock,
-    mockActive: mockPlaying,
+    mockActive: mockState.playing,
   };
 }
 

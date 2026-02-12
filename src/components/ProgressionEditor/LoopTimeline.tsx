@@ -72,6 +72,21 @@ interface SectionData {
   beatsPerBar?: number;
 }
 
+const getBaseSectionBeats = (section: SectionData): number =>
+  section.progression.reduce((sum: number, chord: ChordData) => sum + chord.duration, 0);
+
+const getSectionRepeats = (section: SectionData): number => Math.max(1, section.repeats || 1);
+
+const getTotalSectionBeats = (section: SectionData): number =>
+  getBaseSectionBeats(section) * getSectionRepeats(section);
+
+const formatSecondsToClock = (totalSeconds: number): string => {
+  const safe = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safe / 60);
+  const seconds = Math.floor(safe % 60);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+
 interface SortableSectionProps {
   section: SectionData;
   index: number;
@@ -98,6 +113,10 @@ interface TimelineSectionsProps {
 // Stable memoized TimelineSections component (defined at module scope to keep identity stable)
 // Track and warn once if sections lack ids to avoid console spam
 let warnedMissingDraggableId = false;
+const TIMELINE_MIN_ZOOM = 0.02;
+const TIMELINE_MAX_ZOOM = 1;
+const TRANSPORT_CORRECTION_ALPHA = 0.12;
+const TRANSPORT_HARD_SNAP_BEATS = 2.0;
 
 function SortableSection({
   section,
@@ -106,12 +125,18 @@ function SortableSection({
   getActiveBeatInSection,
   markUserInteraction,
 }: SortableSectionProps) {
-  const sectionBeats = section.progression.reduce(
-    (s: number, c: any) => s + c.duration,
-    0,
-  );
+  const baseSectionBeats = getBaseSectionBeats(section);
+  const sectionRepeats = getSectionRepeats(section);
+  const sectionBeats = baseSectionBeats * sectionRepeats;
   const sectionWidth = sectionBeats * pixelsPerBeat;
   const activeBeat = getActiveBeatInSection(index);
+  const renderedChords = Array.from({ length: sectionRepeats }).flatMap(
+    (_, repeatIndex) =>
+      section.progression.map((chord, chordIndex) => ({
+        chord,
+        key: `${repeatIndex}-${chordIndex}`,
+      })),
+  );
 
   const {
     attributes,
@@ -155,7 +180,7 @@ function SortableSection({
         </div>
 
         <div className="progression-chords">
-          {section.progression.map((chord: any, chordIdx: number) => {
+          {renderedChords.map(({ chord, key }) => {
             const chordWidth = chord.duration * pixelsPerBeat;
             const rootNote =
               chord.metadata?.root !== undefined
@@ -166,7 +191,7 @@ function SortableSection({
             
             return (
               <div
-                key={chordIdx}
+                key={key}
                 className="chord-card"
                 style={{ width: `${chordWidth}px` }}
               >
@@ -183,19 +208,18 @@ function SortableSection({
         <div className="section-detail-expanded">
           <div className="section-meta">
             <div className="section-meta-item">
-              <span className="repeat-badge">×{section.repeats || 1}</span>
+              <span className="repeat-badge">×{sectionRepeats}</span>
             </div>
             <div className="section-meta-item">
               <span>
                 {Math.ceil(
-                  (sectionBeats * (section?.repeats || 1)) /
-                    (section?.beatsPerBar || 4),
+                  sectionBeats / (section?.beatsPerBar || 4),
                 )}{" "}
                 bars
               </span>
             </div>
             <div className="section-meta-item">
-              <span>{section.progression.length} chords</span>
+              <span>{section.progression.length * sectionRepeats} chords</span>
             </div>
             <div className="section-meta-item">
               <span>{sectionBeats} beats</span>
@@ -221,53 +245,18 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
 }: TimelineSectionsProps) {
   const ids = sections.map((s: any) => String(s.id));
 
-  const introBufferCards = (
-    <>
-      <div className="buffer-card">
-        <span className="buffer-title">Song Overview</span>
-        <div className="buffer-content">{sections.length} sections, 48 total beats</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">Key & Tempo</span>
-        <div className="buffer-content">C Major, 120 BPM, 4/4</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">Pattern Info</span>
-        <div className="buffer-content">I-V-vi-IV detected in Section 1</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">💡 Theory Tip</span>
-        <div className="buffer-content">This progression creates tension and release</div>
-      </div>
-    </>
-  );
-
-  const outroBufferCards = (
-    <>
-      <div className="buffer-card">
-        <span className="buffer-title">🔄 Looping back...</span>
-        <div className="buffer-content">Repeating from Section 1</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">📝 Metadata</span>
-        <div className="buffer-content">Saved: 2026-02-10, Tags: Pop</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">🎼 Harmonic Summary</span>
-        <div className="buffer-content">Diatonic: 85%, Borrowed: 15%</div>
-      </div>
-      <div className="buffer-card">
-        <span className="buffer-title">💡 Suggestion</span>
-        <div className="buffer-content">Try adding a pre-chorus section</div>
-      </div>
-    </>
-  );
-
   const renderStaticSection = (section: SectionData, index: number, keyOverride?: string) => {
-    const sectionBeats =
-      section?.progression?.reduce((s: number, c: any) => s + c.duration, 0) || 0;
+    const sectionBeats = getTotalSectionBeats(section);
+    const sectionRepeats = getSectionRepeats(section);
     const sectionWidth = sectionBeats * pixelsPerBeat;
     const activeBeat = getActiveBeatInSection(index);
+    const renderedChords = Array.from({ length: sectionRepeats }).flatMap(
+      (_, repeatIndex) =>
+        section.progression.map((chord, chordIndex) => ({
+          chord,
+          key: `${repeatIndex}-${chordIndex}`,
+        })),
+    );
 
     return (
       <div
@@ -291,7 +280,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
           </div>
 
           <div className="progression-chords">
-            {section?.progression?.map((chord: any, chordIdx: number) => {
+            {renderedChords.map(({ chord, key }) => {
               const chordWidth = chord.duration * pixelsPerBeat;
               const rootNote =
                 chord.metadata?.root !== undefined
@@ -301,9 +290,11 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
               const fullChordName = rootNote ? `${rootNote}${quality}` : quality;
               
               return (
-                <div key={chordIdx} className="chord-card" style={{ width: `${chordWidth}px` }}>
-                  <span className="chord-name">{fullChordName}</span>
-                  <span className="chord-duration">{chord.duration}b</span>
+                <div key={key} className="chord-card" style={{ width: `${chordWidth}px` }}>
+                  <div className="chord-label">
+                    <span className="chord-name">{fullChordName}</span>
+                    <span className="chord-duration">{chord.duration}b</span>
+                  </div>
                 </div>
               );
             })}
@@ -312,19 +303,18 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
           <div className="section-detail-expanded">
             <div className="section-meta">
               <div className="section-meta-item">
-                <span className="repeat-badge">×{section?.repeats || 1}</span>
+                <span className="repeat-badge">×{sectionRepeats}</span>
               </div>
               <div className="section-meta-item">
                 <span>
                   {Math.ceil(
-                    ((sectionBeats || 0) * (section?.repeats || 1)) /
-                      (section?.beatsPerBar || 4),
+                    sectionBeats / (section?.beatsPerBar || 4),
                   )}{" "}
                   bars
                 </span>
               </div>
               <div className="section-meta-item">
-                <span>{section?.progression?.length || 0} chords</span>
+                <span>{(section?.progression?.length || 0) * sectionRepeats} chords</span>
               </div>
               <div className="section-meta-item">
                 <span>{sectionBeats} beats</span>
@@ -345,11 +335,18 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
         onWheel={markUserInteraction}
         onScroll={markUserInteraction}
       >
-        {introBufferCards}
+        <div className="timeline-song-start-marker timeline-song-start-marker--prev" aria-hidden="true" />
+        {sections.map((section: SectionData, index: number) =>
+          renderStaticSection(section, index, `section-static-prev-${index}`),
+        )}
+        <div className="timeline-song-start-marker timeline-song-start-marker--middle" aria-hidden="true" />
         {sections.map((section: SectionData, index: number) =>
           renderStaticSection(section, index, `section-static-${index}`),
         )}
-        {outroBufferCards}
+        <div className="timeline-song-start-marker timeline-song-start-marker--next" aria-hidden="true" />
+        {sections.map((section: SectionData, index: number) =>
+          renderStaticSection(section, index, `section-static-next-${index}`),
+        )}
       </div>
     );
   }
@@ -384,7 +381,11 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
           onWheel={markUserInteraction}
           onScroll={markUserInteraction}
         >
-          {introBufferCards}
+          <div className="timeline-song-start-marker timeline-song-start-marker--prev" aria-hidden="true" />
+          {sections.map((section: SectionData, index: number) =>
+            renderStaticSection(section, index, `section-prev-${index}`),
+          )}
+          <div className="timeline-song-start-marker timeline-song-start-marker--middle" aria-hidden="true" />
 
           {sections.map((section: SectionData, index: number) => {
             if (!section || !section.id) {
@@ -414,7 +415,10 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
             );
           })}
 
-          {outroBufferCards}
+          <div className="timeline-song-start-marker timeline-song-start-marker--next" aria-hidden="true" />
+          {sections.map((section: SectionData, index: number) =>
+            renderStaticSection(section, index, `section-next-${index}`),
+          )}
         </div>
       </SortableContext>
     </DndContext>
@@ -423,7 +427,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
 
 export function LoopTimeline() {
   const { sections, reorderSection } = useProgressionStore();
-  const { play, pause, jumpByBars, jumpToBeat, isConnected } = useLiveStore();
+  const { play, pause, jumpByBars, jumpToBeat, isConnected, transport } = useLiveStore();
 
   const { mode, height, isDragging, changeMode, toggle, handlers } =
     useExpandableTimeline({
@@ -438,6 +442,28 @@ export function LoopTimeline() {
 
   // Ref for animation frame to manage eased scrolling
   const animationFrameRef = useRef<number | null>(null);
+  const autoScrollEnabledRef = useRef(false);
+  const targetScrollLeftRef = useRef(0);
+  const cycleOffsetRef = useRef(0);
+  const hasCenteredInitialScrollRef = useRef(false);
+  const cycleMetricsRef = useRef<{
+    ready: boolean;
+    prevStart: number;
+    middleStart: number;
+    nextStart: number;
+    cycleSpan: number;
+  }>({
+    ready: false,
+    prevStart: 0,
+    middleStart: 0,
+    nextStart: 0,
+    cycleSpan: 1,
+  });
+  const unwrappedBeatRef = useRef(0);
+  const currentBeatRef = useRef(0);
+  const lastRawBeatRef = useRef<number | null>(null);
+  const beatAnchorRef = useRef(0);
+  const beatAnchorTimeRef = useRef(0);
 
   // Helper to convert MIDI note to name
   // NOTE: midiToNoteName is defined at module scope above; avoid redeclaring here.
@@ -449,9 +475,7 @@ export function LoopTimeline() {
     let cumulativeBeat = 0;
     return sections.map((section) => {
       const sectionStartBeat = cumulativeBeat;
-      const sectionBeats =
-        section.progression.reduce((sum, chord) => sum + chord.duration, 0) *
-        (section.repeats || 1);
+      const sectionBeats = getTotalSectionBeats(section);
       cumulativeBeat += sectionBeats;
       return {
         startBeat: sectionStartBeat,
@@ -491,10 +515,41 @@ export function LoopTimeline() {
   const { currentBeat, isPlaying, startMock, stopMock, mockActive } =
     usePlayheadSync({ pixelsPerBeat, totalBeats });
 
-  // Calculate current bar:beat position (based on current playhead)
-  const beatsPerBar = 4;
-  const currentBar = Math.floor(currentBeat / beatsPerBar) + 1;
-  const currentBeatInBar = Math.floor((currentBeat % beatsPerBar) + 1);
+  // Calculate current bar:beat position based on active section time signature
+  const { currentBar, currentBeatInBar } = useMemo(() => {
+    if (totalBeats <= 0 || sectionBeatPositions.length === 0) {
+      return { currentBar: 1, currentBeatInBar: 1 };
+    }
+
+    const loopedBeat = ((currentBeat % totalBeats) + totalBeats) % totalBeats;
+    const activeSectionIndex = sectionBeatPositions.findIndex(
+      (position) => loopedBeat >= position.startBeat && loopedBeat < position.endBeat,
+    );
+
+    if (activeSectionIndex < 0) {
+      return { currentBar: 1, currentBeatInBar: 1 };
+    }
+
+    const activeSection = sections[activeSectionIndex];
+    const beatsPerBar = activeSection?.beatsPerBar || 4;
+    const beatIntoSection = loopedBeat - sectionBeatPositions[activeSectionIndex].startBeat;
+    const barInSection = Math.floor(beatIntoSection / beatsPerBar) + 1;
+    const beatInBar = Math.floor(beatIntoSection % beatsPerBar) + 1;
+
+    const barsBefore = sections.slice(0, activeSectionIndex).reduce((sum, section) => {
+      const sectionBeats = getTotalSectionBeats(section);
+      return sum + Math.ceil(sectionBeats / (section.beatsPerBar || 4));
+    }, 0);
+
+    return {
+      currentBar: barsBefore + barInSection,
+      currentBeatInBar: beatInBar,
+    };
+  }, [currentBeat, sectionBeatPositions, sections, totalBeats]);
+
+  useEffect(() => {
+    currentBeatRef.current = currentBeat;
+  }, [currentBeat]);
 
   // Track whether the user is interacting with the timeline (scroll/drag/resize)
   const [isUserInteracting, setIsUserInteracting] = useState(false);
@@ -512,16 +567,158 @@ export function LoopTimeline() {
 
   // Velocity and legato controls moved to Zone 3 (ProgressionStrip)
 
-  // Auto-scroll: center the active beat under the fixed playhead with eased animation.
-  // Uses requestAnimationFrame for smooth easing and respects user interaction.
+  const computeTargetScrollLeft = useCallback((unwrappedBeat: number) => {
+    const container = scrollContainerRef.current;
+    if (!container || totalBeats <= 0) return null;
+
+    const viewportWidth = container.clientWidth;
+    const songStartOffset = cycleMetricsRef.current.ready
+      ? cycleMetricsRef.current.middleStart
+      : viewportWidth / 2;
+    const songCycleSpanPx = cycleMetricsRef.current.ready
+      ? Math.max(1, cycleMetricsRef.current.cycleSpan)
+      : Math.max(1, totalBeats * pixelsPerBeat);
+
+    const songWidthPx = totalBeats * pixelsPerBeat;
+    const bufferWidthPx = Math.max(0, songCycleSpanPx - songWidthPx);
+    const bufferBeats = bufferWidthPx / pixelsPerBeat;
+
+    const normalizedBeat = Math.max(0, unwrappedBeat);
+    const completedSongLoops =
+      totalBeats > 0 ? Math.floor(normalizedBeat / totalBeats) : 0;
+    const beatInSong = normalizedBeat - completedSongLoops * totalBeats;
+    // Spread buffer travel across the loop phase so wrap is continuous.
+    const bufferProgress =
+      totalBeats > 0 ? (beatInSong / totalBeats) * bufferBeats : 0;
+    const virtualBeat =
+      completedSongLoops * (totalBeats + bufferBeats) +
+      beatInSong +
+      bufferProgress;
+    const rawTarget =
+      songStartOffset + virtualBeat * pixelsPerBeat - viewportWidth / 2;
+    return { rawTarget, viewportWidth, songCycleSpanPx };
+  }, [pixelsPerBeat, totalBeats]);
+
+  const refreshCycleMetrics = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const prevStartMarker = container.querySelector(
+      ".timeline-song-start-marker--prev",
+    ) as HTMLElement | null;
+    const middleStartMarker = container.querySelector(
+      ".timeline-song-start-marker--middle",
+    ) as HTMLElement | null;
+    const nextStartMarker = container.querySelector(
+      ".timeline-song-start-marker--next",
+    ) as HTMLElement | null;
+
+    if (!prevStartMarker || !middleStartMarker || !nextStartMarker) {
+      cycleMetricsRef.current.ready = false;
+      return;
+    }
+
+    const middleStart = middleStartMarker.offsetLeft;
+    const nextStart = nextStartMarker.offsetLeft;
+    const prevStart = prevStartMarker.offsetLeft;
+    cycleMetricsRef.current = {
+      ready: true,
+      prevStart,
+      middleStart,
+      nextStart,
+      cycleSpan: Math.max(1, nextStart - middleStart),
+    };
+  }, []);
+
   useEffect(() => {
-    if (
-      !scrollContainerRef.current ||
-      totalBeats === 0 ||
-      !isPlaying ||
-      isUserInteracting
-    ) {
-      // Stop any ongoing animation
+    refreshCycleMetrics();
+    const onResize = () => refreshCycleMetrics();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [refreshCycleMetrics, sections, pixelsPerBeat, mode]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || hasCenteredInitialScrollRef.current) return;
+    refreshCycleMetrics();
+    if (!cycleMetricsRef.current.ready) return;
+
+    const viewportWidth = container.clientWidth;
+    const start = Math.max(
+      0,
+      cycleMetricsRef.current.middleStart - viewportWidth / 2,
+    );
+    container.scrollLeft = start;
+    targetScrollLeftRef.current = start;
+    cycleOffsetRef.current = 0;
+    hasCenteredInitialScrollRef.current = true;
+  }, [sections, pixelsPerBeat, refreshCycleMetrics]);
+
+  useEffect(() => {
+    const now = performance.now();
+    const tempo = transport?.tempo || 120;
+    const beatsPerMs = tempo / 60000;
+    if (lastRawBeatRef.current === null) {
+      unwrappedBeatRef.current = currentBeat;
+      lastRawBeatRef.current = currentBeat;
+      beatAnchorRef.current = unwrappedBeatRef.current;
+      beatAnchorTimeRef.current = now;
+      return;
+    }
+
+    let delta = currentBeat - lastRawBeatRef.current;
+    if (totalBeats > 0) {
+      const wrapThreshold = Math.max(1, totalBeats * 0.5);
+      if (delta < -wrapThreshold) delta += totalBeats;
+      if (delta > wrapThreshold) delta -= totalBeats;
+    }
+
+    unwrappedBeatRef.current += delta;
+    lastRawBeatRef.current = currentBeat;
+    const predictedNow =
+      beatAnchorRef.current + (now - beatAnchorTimeRef.current) * beatsPerMs;
+    const phaseError = unwrappedBeatRef.current - predictedNow;
+
+    if (Math.abs(phaseError) >= TRANSPORT_HARD_SNAP_BEATS) {
+      beatAnchorRef.current = unwrappedBeatRef.current;
+    } else {
+      beatAnchorRef.current =
+        predictedNow + phaseError * TRANSPORT_CORRECTION_ALPHA;
+    }
+    beatAnchorTimeRef.current = now;
+  }, [currentBeat, totalBeats, transport]);
+
+  const getPredictedBeat = useCallback(() => {
+    if (!isPlaying) return beatAnchorRef.current;
+    const tempo = transport?.tempo || 120;
+    const elapsedMs = Math.max(0, performance.now() - beatAnchorTimeRef.current);
+    return beatAnchorRef.current + elapsedMs * (tempo / 60000);
+  }, [isPlaying, transport]);
+
+  const currentTimeDisplay = useMemo(() => {
+    const tempo = transport?.tempo || 120;
+    const beatForClock = isPlaying ? getPredictedBeat() : currentBeat;
+    const seconds = (Math.max(0, beatForClock) * 60) / tempo;
+    return formatSecondsToClock(seconds);
+  }, [currentBeat, getPredictedBeat, isPlaying, transport]);
+
+  useEffect(() => {
+    const next = computeTargetScrollLeft(unwrappedBeatRef.current);
+    if (next !== null) {
+      targetScrollLeftRef.current = next.rawTarget - cycleOffsetRef.current;
+    }
+  }, [computeTargetScrollLeft, currentBeat]);
+
+  // Auto-scroll: keep a single RAF loop while active and chase the latest target.
+  useEffect(() => {
+    const enabled =
+      !!scrollContainerRef.current &&
+      totalBeats > 0 &&
+      isPlaying &&
+      !isUserInteracting;
+    autoScrollEnabledRef.current = enabled;
+
+    if (!enabled) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -529,31 +726,43 @@ export function LoopTimeline() {
       return;
     }
 
-    const container = scrollContainerRef.current;
-    const loopedBeat = currentBeat % totalBeats;
-    const beatPosition = loopedBeat * pixelsPerBeat;
+    const animate = () => {
+      if (!autoScrollEnabledRef.current || !scrollContainerRef.current) {
+        animationFrameRef.current = null;
+        return;
+      }
 
-    // With 50% padding, we need to account for viewport width to center the beat under the playhead
-    const viewportWidth = container.clientWidth;
-    const targetScrollLeft = beatPosition - viewportWidth / 2;
+      const container = scrollContainerRef.current;
+      const predictedBeat = getPredictedBeat();
+      const computed = computeTargetScrollLeft(predictedBeat);
+      if (computed !== null) {
+        let target = computed.rawTarget - cycleOffsetRef.current;
 
-    // Start eased animation if not already running
-    if (!animationFrameRef.current) {
-      const animate = () => {
-        const currentScroll = container.scrollLeft;
-        const delta = targetScrollLeft - currentScroll;
-        const easeAmount = 0.1; // Adjust for easing speed (lower = smoother/slower)
-        const newScroll = currentScroll + delta * easeAmount;
+        if (cycleMetricsRef.current.ready) {
+          const { middleStart, nextStart, cycleSpan } = cycleMetricsRef.current;
+          const lowThreshold = middleStart - cycleSpan;
+          const highThreshold = nextStart;
 
-        container.scrollLeft = newScroll;
-
-        // Continue if not close enough to target
-        if (Math.abs(delta) > 1) {
-          animationFrameRef.current = requestAnimationFrame(animate);
-        } else {
-          animationFrameRef.current = null;
+          while (target > highThreshold) {
+            cycleOffsetRef.current += cycleSpan;
+            target -= cycleSpan;
+          }
+          while (target < lowThreshold) {
+            cycleOffsetRef.current -= cycleSpan;
+            target += cycleSpan;
+          }
         }
-      };
+
+        const maxScroll = Math.max(0, container.scrollWidth - computed.viewportWidth);
+        targetScrollLeftRef.current = Math.max(0, Math.min(target, maxScroll));
+      }
+      const target = targetScrollLeftRef.current;
+      container.scrollLeft = target;
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    if (!animationFrameRef.current) {
       animationFrameRef.current = requestAnimationFrame(animate);
     }
 
@@ -563,9 +772,16 @@ export function LoopTimeline() {
         animationFrameRef.current = null;
       }
     };
-  }, [currentBeat, totalBeats, pixelsPerBeat, isPlaying, isUserInteracting]);
+  }, [isPlaying, isUserInteracting, totalBeats]);
 
   // Keyboard shortcuts for timeline: T toggle, Shift+T fullscreen, Esc exit fullscreen, +/- zoom
+  useEffect(() => {
+    if (!isPlaying) {
+      beatAnchorRef.current = unwrappedBeatRef.current;
+      beatAnchorTimeRef.current = performance.now();
+    }
+  }, [isPlaying]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Ignore when typing in inputs
@@ -585,9 +801,13 @@ export function LoopTimeline() {
       } else if (e.key === "Escape") {
         changeMode("normal");
       } else if (e.key === "+" || e.key === "=") {
-        setZoomLevel((z) => Math.min(1, +(z + 0.05).toFixed(2)));
+        setZoomLevel((z) =>
+          Math.min(TIMELINE_MAX_ZOOM, +(z + 0.05).toFixed(2)),
+        );
       } else if (e.key === "-") {
-        setZoomLevel((z) => Math.max(0, +(z - 0.05).toFixed(2)));
+        setZoomLevel((z) =>
+          Math.max(TIMELINE_MIN_ZOOM, +(z - 0.05).toFixed(2)),
+        );
       }
     };
 
@@ -600,7 +820,7 @@ export function LoopTimeline() {
     (sectionIndex: number) => {
       if (totalBeats === 0) return -1;
 
-      const loopedBeat = currentBeat % totalBeats;
+      const loopedBeat = currentBeatRef.current % totalBeats;
       const position = sectionBeatPositions[sectionIndex];
 
       if (loopedBeat >= position.startBeat && loopedBeat < position.endBeat) {
@@ -608,7 +828,7 @@ export function LoopTimeline() {
       }
       return -1;
     },
-    [currentBeat, totalBeats, sectionBeatPositions],
+    [totalBeats, sectionBeatPositions],
   );
 
   // Handle drag-and-drop reordering (dnd-kit)
@@ -676,8 +896,8 @@ export function LoopTimeline() {
               <ZoomOut size={14} style={{ color: "rgba(0, 0, 0, 0.5)" }} />
               <input
                 type="range"
-                min="0"
-                max="1"
+                min={TIMELINE_MIN_ZOOM}
+                max={TIMELINE_MAX_ZOOM}
                 step="0.01"
                 value={zoomLevel}
                 onChange={(e) => setZoomLevel(Number(e.target.value))}
@@ -812,7 +1032,7 @@ export function LoopTimeline() {
               <span className="position-separator">|</span>
               <span>Beat {currentBeatInBar}</span>
               <span className="position-separator">|</span>
-              <span>00:00</span>
+              <span>{currentTimeDisplay}</span>
             </div>
 
             {/* Loop toggle */}
