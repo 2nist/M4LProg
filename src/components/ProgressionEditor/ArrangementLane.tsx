@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Copy, Trash2, ChevronsUpDown, Pencil } from "lucide-react";
 import type { Section } from "@/types/progression";
-import type { ArrangementBlock, ModeId } from "@/types/arrangement";
+import type { ModeId } from "@/types/arrangement";
 import { computePxPerBeat } from "@/utils/pxPerBeat";
+import { useProgressionStore } from "@/stores/progressionStore";
 
 type Props = {
   mode: ModeId;
@@ -19,44 +20,6 @@ type Props = {
 const getSectionBeats = (section: Section): number =>
   section.progression.reduce((sum, chord) => sum + (chord.duration || 0), 0);
 
-const createLaneBlock = (
-  section: Section,
-  startBeat: number,
-  mode: ModeId = "harmony",
-): ArrangementBlock => {
-  const repeats = Math.max(1, section.repeats || 1);
-  const baseBeats = Math.max(1, getSectionBeats(section));
-  const lengthBeats = baseBeats * repeats;
-  return {
-    id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
-    sourceId: section.id,
-    mode,
-    startBeat,
-    lengthBeats,
-    label: section.name || "Section",
-    repeats: 1,
-    intent: "main",
-  };
-};
-
-const reflowBlocks = (blocks: ArrangementBlock[], sectionMap: Map<string, Section>) => {
-  let cursor = 0;
-  return blocks.map((block) => {
-    const section = sectionMap.get(block.sourceId);
-    const repeats = Math.max(1, section?.repeats || 1);
-    const baseBeats = Math.max(1, section ? getSectionBeats(section) : 4);
-    const lengthBeats = baseBeats * repeats;
-    const next: ArrangementBlock = {
-      ...block,
-      startBeat: cursor,
-      lengthBeats,
-      label: section?.name || block.label,
-    };
-    cursor += lengthBeats;
-    return next;
-  });
-};
-
 export default function ArrangementLane({
   mode,
   sections,
@@ -68,55 +31,39 @@ export default function ArrangementLane({
   onDeleteSection,
   onLoadExample,
 }: Props) {
+  const arrangementBlocks = useProgressionStore((s) => s.arrangementBlocks);
+  const selectedBlockId = useProgressionStore((s) => s.selectedArrangementBlockId);
+  const selectArrangementBlock = useProgressionStore((s) => s.selectArrangementBlock);
+  const addArrangementBlockFromSection = useProgressionStore(
+    (s) => s.addArrangementBlockFromSection,
+  );
+  const duplicateArrangementBlock = useProgressionStore(
+    (s) => s.duplicateArrangementBlock,
+  );
+  const deleteArrangementBlock = useProgressionStore((s) => s.deleteArrangementBlock);
+  const setArrangementBlockRepeats = useProgressionStore(
+    (s) => s.setArrangementBlockRepeats,
+  );
+  const setArrangementBlockMidiChannel = useProgressionStore(
+    (s) => s.setArrangementBlockMidiChannel,
+  );
+
   const [snap, setSnap] = useState<"bar" | "beat">("bar");
   const [zoom, setZoom] = useState(0.45);
   const [showSourceTray, setShowSourceTray] = useState(true);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [laneBlocks, setLaneBlocks] = useState<ArrangementBlock[]>([]);
-
-  const sectionMap = useMemo(
-    () => new Map(sections.map((section) => [section.id, section])),
-    [sections],
-  );
 
   useEffect(() => {
-    setLaneBlocks((prev) => {
-      if (prev.length === 0) {
-        const seeded: ArrangementBlock[] = [];
-        let startBeat = 0;
-        for (const section of sections) {
-          const block = createLaneBlock(section, startBeat, mode);
-          seeded.push(block);
-          startBeat += block.lengthBeats;
-        }
-        return seeded;
-      }
-
-      const valid = prev.filter((block) => sectionMap.has(block.sourceId));
-      const coveredSourceIds = new Set(valid.map((block) => block.sourceId));
-      const missingSections = sections.filter(
-        (section) => !coveredSourceIds.has(section.id),
-      );
-
-      if (missingSections.length === 0) {
-        return reflowBlocks(valid, sectionMap);
-      }
-
-      const appended = [...valid];
-      let tailStart = valid.reduce((sum, block) => sum + block.lengthBeats, 0);
-      for (const section of missingSections) {
-        const next = createLaneBlock(section, tailStart, mode);
-        appended.push(next);
-        tailStart += next.lengthBeats;
-      }
-
-      return reflowBlocks(appended, sectionMap);
-    });
-  }, [sections, sectionMap, mode]);
+    if (
+      selectedBlockId &&
+      !arrangementBlocks.some((block) => block.id === selectedBlockId)
+    ) {
+      selectArrangementBlock(null);
+    }
+  }, [arrangementBlocks, selectedBlockId, selectArrangementBlock]);
 
   const totalBeats = useMemo(
-    () => laneBlocks.reduce((sum, block) => sum + block.lengthBeats, 0),
-    [laneBlocks],
+    () => arrangementBlocks.reduce((sum, block) => sum + block.lengthBeats, 0),
+    [arrangementBlocks],
   );
 
   const pixelsPerBeat = computePxPerBeat({
@@ -128,42 +75,21 @@ export default function ArrangementLane({
     viewportWidth: 1200,
   });
 
-  const selectedBlock = laneBlocks.find((block) => block.id === selectedBlockId) || null;
-  const selectedSectionIndex =
-    selectedBlock
-      ? sections.findIndex((section) => section.id === selectedBlock.sourceId)
-      : currentSectionIndex;
-  const selectedSection = selectedSectionIndex >= 0 ? sections[selectedSectionIndex] : null;
+  const selectedBlock =
+    arrangementBlocks.find((block) => block.id === selectedBlockId) || null;
 
   const handleAddSectionToLane = (sectionId: string) => {
-    const section = sectionMap.get(sectionId);
-    if (!section) return;
-    setLaneBlocks((prev) => {
-      const next = [...prev, createLaneBlock(section, 0, "harmony")];
-      return reflowBlocks(next, sectionMap);
-    });
+    addArrangementBlockFromSection(sectionId, mode);
   };
 
   const handleDuplicateSelected = () => {
     if (!selectedBlock) return;
-    setLaneBlocks((prev) => {
-      const idx = prev.findIndex((block) => block.id === selectedBlock.id);
-      if (idx < 0) return prev;
-      const clone: ArrangementBlock = {
-        ...selectedBlock,
-        id: `arr-${selectedBlock.sourceId}-${Math.random().toString(36).slice(2, 8)}`,
-      };
-      const next = [...prev.slice(0, idx + 1), clone, ...prev.slice(idx + 1)];
-      return reflowBlocks(next, sectionMap);
-    });
+    duplicateArrangementBlock(selectedBlock.id);
   };
 
   const handleDeleteSelected = () => {
     if (!selectedBlock) return;
-    setLaneBlocks((prev) =>
-      reflowBlocks(prev.filter((block) => block.id !== selectedBlock.id), sectionMap),
-    );
-    setSelectedBlockId(null);
+    deleteArrangementBlock(selectedBlock.id);
   };
 
   return (
@@ -206,19 +132,49 @@ export default function ArrangementLane({
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wide muted-text">Section Repeats</span>
+          <span className="text-[10px] uppercase tracking-wide muted-text">Block Repeats</span>
           <input
             type="range"
             min={1}
             max={16}
             step={1}
-            value={selectedSection?.repeats || 1}
-            onChange={(e) => onSetCurrentSectionRepeats(Number(e.target.value) || 1)}
+            value={selectedBlock?.repeats || 1}
+            onChange={(e) => {
+              if (!selectedBlock) return;
+              const repeats = Number(e.target.value) || 1;
+              setArrangementBlockRepeats(selectedBlock.id, repeats);
+              onSetCurrentSectionRepeats(repeats);
+            }}
             className="progression-param-slider"
+            disabled={!selectedBlock}
           />
           <span className="text-xs muted-text font-mono w-6 text-center">
-            {selectedSection?.repeats || 1}
+            {selectedBlock?.repeats || 1}
           </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wide muted-text">MIDI Ch</span>
+          <select
+            className="h-7 text-xs compact"
+            value={selectedBlock?.midiChannel || 0}
+            onChange={(e) => {
+              if (!selectedBlock) return;
+              const next = Number(e.target.value);
+              setArrangementBlockMidiChannel(
+                selectedBlock.id,
+                next > 0 ? next : undefined,
+              );
+            }}
+            disabled={!selectedBlock}
+          >
+            <option value={0}>Mode</option>
+            {Array.from({ length: 16 }, (_, idx) => idx + 1).map((channel) => (
+              <option key={channel} value={channel}>
+                Ch {channel}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
@@ -255,12 +211,12 @@ export default function ArrangementLane({
 
       <div className="px-3 py-3 overflow-x-auto">
         <div className="flex gap-2 min-w-max">
-          {laneBlocks.length === 0 ? (
+          {arrangementBlocks.length === 0 ? (
             <div className="text-xs muted-text px-2 py-6">
               Arrangement is empty. Add blocks from the Source Tray below.
             </div>
           ) : (
-            laneBlocks.map((block) => {
+            arrangementBlocks.map((block) => {
               const sourceIndex = sections.findIndex((section) => section.id === block.sourceId);
               const isSelected = selectedBlockId === block.id;
               const isActiveSource = sourceIndex === currentSectionIndex;
@@ -281,7 +237,7 @@ export default function ArrangementLane({
                   } relative overflow-hidden`}
                   style={{ width: `${Math.max(140, block.lengthBeats * pixelsPerBeat)}px` }}
                   onClick={() => {
-                    setSelectedBlockId(block.id);
+                    selectArrangementBlock(block.id);
                     if (sourceIndex >= 0) onSelectSection(sourceIndex);
                   }}
                   title={`${block.label} (${Math.round(block.lengthBeats)} beats)`}

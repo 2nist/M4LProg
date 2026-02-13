@@ -12,8 +12,68 @@ import type { Section, ProgressionSnapshot } from "../types/progression";
 import type { Pattern } from "../types/pattern";
 import type { Progression, Chord } from "../types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
-import type { ModeId } from "@/types/arrangement";
+import type { ArrangementBlock, ModeId } from "@/types/arrangement";
 import * as ProgressionManager from "@services/progression/ProgressionManager";
+
+const getSectionBaseBeats = (section: Section): number =>
+  Math.max(
+    1,
+    section.progression.reduce((sum, chord) => sum + (chord.duration || 0), 0),
+  );
+
+const sanitizeMidiChannel = (value?: number): number | undefined => {
+  if (typeof value !== "number" || Number.isNaN(value)) return undefined;
+  return Math.max(1, Math.min(16, Math.floor(value)));
+};
+
+const normalizeArrangementBlocks = (
+  blocks: ArrangementBlock[],
+  sections: Section[],
+  fallbackMode: ModeId,
+  seedIfEmpty: boolean,
+): ArrangementBlock[] => {
+  const sectionMap = new Map(sections.map((section) => [section.id, section]));
+  let filtered = blocks.filter((block) => sectionMap.has(block.sourceId));
+
+  if (filtered.length === 0 && seedIfEmpty) {
+    let startBeat = 0;
+    filtered = sections.map((section) => {
+      const repeats = Math.max(1, section.repeats || 1);
+      const lengthBeats = getSectionBaseBeats(section) * repeats;
+      const block: ArrangementBlock = {
+        id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
+        sourceId: section.id,
+        mode: fallbackMode,
+        startBeat,
+        lengthBeats,
+        label: section.name || "Section",
+        repeats,
+        intent: "main",
+      };
+      startBeat += lengthBeats;
+      return block;
+    });
+  }
+
+  let cursor = 0;
+  return filtered.map((block) => {
+    const section = sectionMap.get(block.sourceId);
+    const repeats = Math.max(1, block.repeats || section?.repeats || 1);
+    const baseBeats = Math.max(1, section ? getSectionBaseBeats(section) : 4);
+    const lengthBeats = baseBeats * repeats;
+    const next: ArrangementBlock = {
+      ...block,
+      mode: block.mode || fallbackMode,
+      midiChannel: sanitizeMidiChannel(block.midiChannel),
+      startBeat: cursor,
+      lengthBeats,
+      label: section?.name || block.label || "Section",
+      repeats,
+    };
+    cursor += lengthBeats;
+    return next;
+  });
+};
 
 interface ProgressionState {
   // ============================================================================
@@ -38,6 +98,22 @@ interface ProgressionState {
   /** Global editor mode (affects Mode Controls, Mode Matrix, Arrangement Lane) */
   uiMode: ModeId;
   setUiMode: (mode: ModeId) => void;
+
+  /** Arrangement source of truth (shared timeline across all modes) */
+  arrangementBlocks: ArrangementBlock[];
+  selectedArrangementBlockId: string | null;
+  selectArrangementBlock: (blockId: string | null) => void;
+  setArrangementBlocks: (blocks: ArrangementBlock[]) => void;
+  rebuildArrangementFromSections: () => void;
+  addArrangementBlockFromSection: (sectionId: string, mode?: ModeId) => void;
+  duplicateArrangementBlock: (blockId: string) => void;
+  deleteArrangementBlock: (blockId: string) => void;
+  reorderArrangementBlock: (fromIndex: number, toIndex: number) => void;
+  setArrangementBlockRepeats: (blockId: string, repeats: number) => void;
+  setArrangementBlockMidiChannel: (
+    blockId: string,
+    channel?: number,
+  ) => void;
 
   /** Select a progression slot for editing */
   selectSlot: (index: number | null) => void;
@@ -161,12 +237,20 @@ interface ProgressionState {
   reset: () => void;
 }
 
+const initialSection = ProgressionManager.createEmptySection("Section 1");
 const initialState = {
   keyRoot: 60, // C
   mode: "Ionian" as ModaleName,
   uiMode: "harmony" as ModeId,
   selectedSlot: null,
-  sections: [ProgressionManager.createEmptySection("Section 1")],
+  sections: [initialSection],
+  arrangementBlocks: normalizeArrangementBlocks(
+    [],
+    [initialSection],
+    "harmony",
+    true,
+  ),
+  selectedArrangementBlockId: null as string | null,
   currentSectionIndex: 0,
   customPatterns: [],
   savedProgressions: {},
@@ -191,6 +275,139 @@ export const useProgressionStore = create<ProgressionState>()(
 
       setUiMode: (mode: ModeId) => {
         set({ uiMode: mode });
+      },
+
+      selectArrangementBlock: (blockId: string | null) => {
+        set({ selectedArrangementBlockId: blockId });
+      },
+
+      setArrangementBlocks: (blocks: ArrangementBlock[]) => {
+        const { sections, uiMode } = get();
+        const nextBlocks = normalizeArrangementBlocks(
+          blocks,
+          sections,
+          uiMode,
+          false,
+        );
+        const selected = get().selectedArrangementBlockId;
+        const keepSelected =
+          selected && nextBlocks.some((block) => block.id === selected)
+            ? selected
+            : null;
+        set({
+          arrangementBlocks: nextBlocks,
+          selectedArrangementBlockId: keepSelected,
+        });
+      },
+
+      rebuildArrangementFromSections: () => {
+        const { sections, uiMode } = get();
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(
+            [],
+            sections,
+            uiMode,
+            true,
+          ),
+          selectedArrangementBlockId: null,
+        });
+      },
+
+      addArrangementBlockFromSection: (sectionId: string, mode?: ModeId) => {
+        const { sections, arrangementBlocks, uiMode } = get();
+        const section = sections.find((s) => s.id === sectionId);
+        if (!section) return;
+        const repeats = Math.max(1, section.repeats || 1);
+        const nextBlock: ArrangementBlock = {
+          id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
+          sourceId: section.id,
+          mode: mode || uiMode,
+          startBeat: 0,
+          lengthBeats: getSectionBaseBeats(section) * repeats,
+          label: section.name || "Section",
+          repeats,
+          intent: "main",
+        };
+        const nextBlocks = normalizeArrangementBlocks(
+          [...arrangementBlocks, nextBlock],
+          sections,
+          uiMode,
+          false,
+        );
+        set({ arrangementBlocks: nextBlocks });
+      },
+
+      duplicateArrangementBlock: (blockId: string) => {
+        const { arrangementBlocks, sections, uiMode } = get();
+        const index = arrangementBlocks.findIndex((block) => block.id === blockId);
+        if (index < 0) return;
+        const source = arrangementBlocks[index];
+        const duplicate: ArrangementBlock = {
+          ...source,
+          id: `arr-${source.sourceId}-${Math.random().toString(36).slice(2, 8)}`,
+        };
+        const next = [
+          ...arrangementBlocks.slice(0, index + 1),
+          duplicate,
+          ...arrangementBlocks.slice(index + 1),
+        ];
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
+        });
+      },
+
+      deleteArrangementBlock: (blockId: string) => {
+        const { arrangementBlocks, sections, uiMode } = get();
+        const next = arrangementBlocks.filter((block) => block.id !== blockId);
+        const selected = get().selectedArrangementBlockId;
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
+          selectedArrangementBlockId:
+            selected === blockId ? null : selected,
+        });
+      },
+
+      reorderArrangementBlock: (fromIndex: number, toIndex: number) => {
+        const { arrangementBlocks, sections, uiMode } = get();
+        if (
+          fromIndex === toIndex ||
+          fromIndex < 0 ||
+          toIndex < 0 ||
+          fromIndex >= arrangementBlocks.length ||
+          toIndex >= arrangementBlocks.length
+        ) {
+          return;
+        }
+        const next = [...arrangementBlocks];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
+        });
+      },
+
+      setArrangementBlockRepeats: (blockId: string, repeats: number) => {
+        const { arrangementBlocks, sections, uiMode } = get();
+        const safeRepeats = Math.max(1, Math.floor(repeats || 1));
+        const next = arrangementBlocks.map((block) =>
+          block.id === blockId ? { ...block, repeats: safeRepeats } : block,
+        );
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
+        });
+      },
+
+      setArrangementBlockMidiChannel: (blockId: string, channel?: number) => {
+        const { arrangementBlocks, sections, uiMode } = get();
+        const safeChannel = sanitizeMidiChannel(channel);
+        const next = arrangementBlocks.map((block) =>
+          block.id === blockId
+            ? { ...block, midiChannel: safeChannel }
+            : block,
+        );
+        set({
+          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
+        });
       },
 
       selectSlot: (index: number | null) => {
@@ -233,17 +450,32 @@ export const useProgressionStore = create<ProgressionState>()(
         );
         set({
           sections: safeSections,
+          arrangementBlocks: normalizeArrangementBlocks(
+            [],
+            safeSections,
+            get().uiMode,
+            true,
+          ),
+          selectedArrangementBlockId: null,
           currentSectionIndex: safeIndex,
           selectedSlot: null,
         });
       },
 
       updateCurrentSection: (section: Section) => {
-        const { sections, currentSectionIndex } = get();
+        const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
         const newSections = [...sections];
         newSections[currentSectionIndex] =
           ProgressionManager.cloneSection(section);
-        set({ sections: newSections });
+        set({
+          sections: newSections,
+          arrangementBlocks: normalizeArrangementBlocks(
+            arrangementBlocks,
+            newSections,
+            uiMode,
+            false,
+          ),
+        });
       },
 
       moveSection: (offset: number) => {
@@ -266,39 +498,78 @@ export const useProgressionStore = create<ProgressionState>()(
       },
 
       deleteSection: (index: number) => {
-        const { sections, currentSectionIndex } = get();
+        const {
+          sections,
+          currentSectionIndex,
+          arrangementBlocks,
+          selectedArrangementBlockId,
+          uiMode,
+        } = get();
 
         // Don't delete if it's the last section
         if (sections.length <= 1) return;
 
+        const removedSectionId = sections[index]?.id;
         const newSections = sections.filter((_, i) => i !== index);
         const newIndex =
           currentSectionIndex >= newSections.length
             ? newSections.length - 1
             : currentSectionIndex;
+        const filteredBlocks = arrangementBlocks.filter(
+          (block) => block.sourceId !== removedSectionId,
+        );
+        const nextBlocks = normalizeArrangementBlocks(
+          filteredBlocks,
+          newSections,
+          uiMode,
+          false,
+        );
+        const nextSelected =
+          selectedArrangementBlockId &&
+          nextBlocks.some((block) => block.id === selectedArrangementBlockId)
+            ? selectedArrangementBlockId
+            : null;
 
         set({
           sections: newSections,
+          arrangementBlocks: nextBlocks,
+          selectedArrangementBlockId: nextSelected,
           currentSectionIndex: newIndex,
         });
       },
 
       renameSection: (name: string) => {
-        const { sections, currentSectionIndex } = get();
+        const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
         const newSections = [...sections];
         newSections[currentSectionIndex] = {
           ...newSections[currentSectionIndex],
           name,
         };
-        set({ sections: newSections });
+        set({
+          sections: newSections,
+          arrangementBlocks: normalizeArrangementBlocks(
+            arrangementBlocks,
+            newSections,
+            uiMode,
+            false,
+          ),
+        });
       },
 
       renameSectionAt: (index: number, name: string) => {
-        const { sections } = get();
+        const { sections, arrangementBlocks, uiMode } = get();
         if (index < 0 || index >= sections.length) return;
         const newSections = [...sections];
         newSections[index] = { ...newSections[index], name };
-        set({ sections: newSections });
+        set({
+          sections: newSections,
+          arrangementBlocks: normalizeArrangementBlocks(
+            arrangementBlocks,
+            newSections,
+            uiMode,
+            false,
+          ),
+        });
       },
 
       reorderSection: (fromIndex: number, toIndex: number) => {
@@ -531,7 +802,9 @@ export const useProgressionStore = create<ProgressionState>()(
         // Only persist these fields
         keyRoot: state.keyRoot,
         mode: state.mode,
+        uiMode: state.uiMode,
         sections: state.sections,
+        arrangementBlocks: state.arrangementBlocks,
         currentSectionIndex: state.currentSectionIndex,
         customPatterns: state.customPatterns,
         savedProgressions: state.savedProgressions,

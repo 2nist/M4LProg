@@ -18,6 +18,8 @@ export interface ArrangementBlock {
   id: string;
   sourceId: string;
   mode: ModeId;
+  /** Optional MIDI channel override (1-16). If omitted, mode/global defaults apply. */
+  midiChannel?: number;
   startBeat: number;
   lengthBeats: number;
   label: string;
@@ -36,4 +38,3 @@ export interface SourceTrayItem {
   beats: number;
   sourceVersion?: number;
 }
-

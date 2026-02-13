@@ -10,7 +10,7 @@
  * - Bank A-H: Song sections (Verse, Chorus, Bridge, etc.)
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 // framer-motion: used in child components (ProgressionStrip), not directly here
 import { Trash2, Plus, ArrowUp, Copy, Send, Music2, Clock } from "lucide-react";
 import { InputModal, ConfirmModal } from "../Modal";
@@ -30,6 +30,15 @@ import SongSettings from "./SongSettings";
 import LeftNavMenu from "./LeftNavMenu";
 import ToolsPanel from "./ToolsPanel";
 import FocusTrap from "../common/FocusTrap";
+import ConnectionMonitorPanel from "./ConnectionMonitorPanel";
+import { useLiveStore } from "@stores/liveStore";
+import {
+  buildArrangedChordEvents,
+  toOscProgression,
+} from "@services/output/ArrangementOutput";
+import { getAdapterById } from "@services/output/OutputAdapters";
+import { useRoutingStore } from "@stores/routingStore";
+import { sendArrangedEventsToWebMidi } from "@services/output/WebMidiOutService";
 
 // ATOM SQ Constants
 const PAD_COUNT = 16;
@@ -135,8 +144,18 @@ export function ProgressionEditor() {
     deleteSection,
     uiMode,
     setSections,
+    arrangementBlocks,
   } = useProgressionStore();
   const { openDrawer, setOpenDrawer } = useProgressionStore();
+  const createProgressionInLive = useLiveStore((s) => s.createProgression);
+  const oscOutRoute = useRoutingStore((s) => s.oscOutRoute);
+  const midiOutRoute = useRoutingStore((s) => s.midiOutRoute);
+  const midiOutDeviceId = useRoutingStore((s) => s.midiOutDeviceId);
+  const midiOutChannel = useRoutingStore((s) => s.midiOutChannel);
+  const modeDefaultChannels = useRoutingStore((s) => s.modeDefaultChannels);
+  const pulseMidiOut = useRoutingStore((s) => s.pulseMidiOut);
+  const setMidiOutSignal = useRoutingStore((s) => s.setMidiOutSignal);
+  const pushConnectionEvent = useRoutingStore((s) => s.pushConnectionEvent);
 
   const { initializeMIDI } = useHardwareStore();
 
@@ -170,6 +189,10 @@ export function ProgressionEditor() {
 
   const section = getCurrentSection();
   const progression = section.progression;
+  const arrangedEvents = useMemo(
+    () => buildArrangedChordEvents(sections, arrangementBlocks),
+    [sections, arrangementBlocks],
+  );
   const uiModeLabel =
     uiMode === "harmony" ? "Harmony" : uiMode === "drum" ? "Drum" : "Mode";
 
@@ -344,10 +367,65 @@ export function ProgressionEditor() {
     selectSlot(null);
   }, [clearProgression, selectSlot]);
 
-  const handleSend = useCallback(() => {
-    // TODO: Send to Ableton Live via OSC
-    console.log("Send to Live:", progression);
-  }, [progression]);
+  const handleSend = useCallback(async () => {
+    const oscPayload = toOscProgression(arrangedEvents);
+    if (oscPayload.length === 0 || arrangedEvents.length === 0) {
+      console.warn("No arranged events available to send");
+      return;
+    }
+
+    const oscRoute = getAdapterById(oscOutRoute);
+    if (oscRoute && oscRoute.availability === "available") {
+      createProgressionInLive(oscPayload);
+      pushConnectionEvent(
+        "osc",
+        `sent ${oscPayload.length} items (${arrangedEvents.length} events)`,
+      );
+    }
+
+    const midiRoute = getAdapterById(midiOutRoute);
+    if (midiRoute && midiRoute.availability === "available") {
+      await sendArrangedEventsToWebMidi(arrangedEvents, {
+        outputId: midiOutDeviceId,
+        channel: midiOutChannel,
+        modeChannels: modeDefaultChannels,
+        onEventSent: pulseMidiOut,
+        onSignal: ({ type, note, channel, velocity }) => {
+          if (type === "all_off") {
+            setMidiOutSignal(`all off ch${channel}`);
+            return;
+          }
+          const noteLabel =
+            typeof note === "number"
+              ? `${NOTE_NAMES[note % 12]}${Math.floor(note / 12) - 1}`
+              : "note";
+          const vel = typeof velocity === "number" ? velocity : 0;
+          setMidiOutSignal(`${type} ${noteLabel} v${vel} ch${channel}`);
+        },
+      });
+    }
+
+    console.log("Sent arranged timeline:", {
+      eventCount: arrangedEvents.length,
+      progressionLength: oscPayload.length,
+      oscRoute: oscRoute?.id || "none",
+      midiRoute: midiRoute?.id || "none",
+      midiChannel: midiOutChannel,
+    });
+  }, [
+    arrangedEvents,
+    createProgressionInLive,
+    midiOutChannel,
+    midiOutDeviceId,
+    midiOutRoute,
+    modeDefaultChannels,
+    oscOutRoute,
+    pulseMidiOut,
+    setMidiOutSignal,
+    pushConnectionEvent,
+  ]);
+
+  const canSendArrangement = arrangedEvents.length > 0;
 
   // Load chord from slot into encoder state
   const loadSlotIntoEncoder = useCallback(
@@ -515,6 +593,7 @@ export function ProgressionEditor() {
                         {openDrawer === "export" && (
                           <div className="text-xs muted-text">Export options (TODO)</div>
                         )}
+                        {openDrawer === "monitor" && <ConnectionMonitorPanel />}
 
                         <div className="pt-2 border-t border-panel/20 mt-2">
                           <ToolsPanel />
@@ -777,7 +856,7 @@ export function ProgressionEditor() {
 
                 <button
                   onClick={handleSend}
-                  disabled={progression.length === 0}
+                  disabled={!canSendArrangement}
                   className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact disabled:opacity-50 active:scale-95"
                   title="Send to Ableton Live"
                 >

@@ -1042,6 +1042,179 @@ textarea {
   pointer-events: auto;
 }
 
+.header-brand {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(0, 0, 0, 0.82);
+  text-transform: uppercase;
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.header-connection-array {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.header-midi-signal {
+  margin-left: 0.45rem;
+  max-width: 220px;
+  font-size: 0.6rem;
+  color: rgba(0, 0, 0, 0.82);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 1px solid rgba(0, 0, 0, 0.24);
+  padding-left: 0.45rem;
+}
+
+.header-connection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.45rem !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(0, 0, 0, 0.3) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+  font-size: 0.62rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.header-connection-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+.header-connection-dot.is-online {
+  background: #16a34a;
+}
+
+.header-connection-dot.is-offline {
+  background: #7c2d12;
+}
+
+.header-connection-dot.is-pulsing {
+  animation: midiPulse 260ms ease-out;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.35);
+}
+
+@keyframes midiPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.45);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.header-connection-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.routing-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.routing-modal-caption {
+  font-size: 0.75rem;
+  color: var(--color-muted-foreground);
+  margin-bottom: 0.2rem;
+}
+
+.routing-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 0.35rem;
+}
+
+.routing-group-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.routing-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.25rem 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.routing-row input[type="radio"] {
+  margin-top: 0.15rem;
+}
+
+.routing-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.routing-row-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.routing-row-desc {
+  font-size: 0.7rem;
+  color: var(--color-muted-foreground);
+}
+
+.routing-pill {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 0.05rem 0.3rem;
+}
+
+.routing-inline-controls {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 0.45rem;
+  margin: 0.1rem 0 0.25rem;
+}
+
+.routing-inline-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.routing-inline-select {
+  height: 1.7rem;
+  font-size: 0.72rem;
+  padding: 0 0.35rem !important;
+}
+
 /* Modal/backdrop helpers */
 .modal-backdrop {
   background-color: rgba(0, 0, 0, 0.7);

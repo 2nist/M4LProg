@@ -39,6 +39,12 @@ export default function LeftNavMenu() {
         >
           Settings
         </button>
+        <button
+          className="btn-muted px-3 py-2"
+          onClick={() => setOpenDrawer("monitor")}
+        >
+          Monitor
+        </button>
       </div>
 
       <div className="mt-3 text-xs muted-text">Quick Sections</div>
