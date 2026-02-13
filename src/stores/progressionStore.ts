@@ -12,6 +12,7 @@ import type { Section, ProgressionSnapshot } from "../types/progression";
 import type { Pattern } from "../types/pattern";
 import type { Progression, Chord } from "../types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
+import type { ModeId } from "@/types/arrangement";
 import * as ProgressionManager from "@services/progression/ProgressionManager";
 
 interface ProgressionState {
@@ -33,6 +34,10 @@ interface ProgressionState {
 
   /** Set mode */
   setMode: (mode: ModaleName) => void;
+
+  /** Global editor mode (affects Mode Controls, Mode Matrix, Arrangement Lane) */
+  uiMode: ModeId;
+  setUiMode: (mode: ModeId) => void;
 
   /** Select a progression slot for editing */
   selectSlot: (index: number | null) => void;
@@ -58,6 +63,9 @@ interface ProgressionState {
 
   /** Load a section by index */
   loadSection: (index: number) => void;
+
+  /** Replace entire song section list (dev/tools import path) */
+  setSections: (sections: Section[], currentSectionIndex?: number) => void;
 
   /** Update current section */
   updateCurrentSection: (section: Section) => void;
@@ -156,6 +164,7 @@ interface ProgressionState {
 const initialState = {
   keyRoot: 60, // C
   mode: "Ionian" as ModaleName,
+  uiMode: "harmony" as ModeId,
   selectedSlot: null,
   sections: [ProgressionManager.createEmptySection("Section 1")],
   currentSectionIndex: 0,
@@ -178,6 +187,10 @@ export const useProgressionStore = create<ProgressionState>()(
 
       setMode: (mode: ModaleName) => {
         set({ mode });
+      },
+
+      setUiMode: (mode: ModeId) => {
+        set({ uiMode: mode });
       },
 
       selectSlot: (index: number | null) => {
@@ -204,6 +217,25 @@ export const useProgressionStore = create<ProgressionState>()(
         if (index >= 0 && index < sections.length) {
           set({ currentSectionIndex: index });
         }
+      },
+
+      setSections: (sections: Section[], nextIndex?: number) => {
+        const safeSections =
+          sections.length > 0
+            ? sections.map((section) => ProgressionManager.cloneSection(section))
+            : [ProgressionManager.createEmptySection("Section 1")];
+        const safeIndex = Math.max(
+          0,
+          Math.min(
+            safeSections.length - 1,
+            nextIndex ?? get().currentSectionIndex,
+          ),
+        );
+        set({
+          sections: safeSections,
+          currentSectionIndex: safeIndex,
+          selectedSlot: null,
+        });
       },
 
       updateCurrentSection: (section: Section) => {

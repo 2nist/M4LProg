@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { useProgressionStore } from "@stores/progressionStore";
 import { Repeat, Edit3, Trash2, Copy } from "lucide-react";
+import type { ModeId } from "@/types/arrangement";
 
 export default function SongOverview() {
   const {
@@ -11,6 +12,8 @@ export default function SongOverview() {
     duplicateSection,
     deleteSection,
     renameSectionAt,
+    uiMode,
+    setUiMode,
   } = useProgressionStore();
 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -56,7 +59,22 @@ export default function SongOverview() {
 
   return (
     <div>
-      <div className="mb-1 text-xs muted-text">Song Overview</div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="text-xs muted-text">Song Overview</div>
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] uppercase tracking-wide muted-text">Mode</span>
+          <select
+            className="h-6 text-[10px] compact"
+            value={uiMode}
+            onChange={(e) => setUiMode(e.target.value as ModeId)}
+            title="Global mode for Controls, Matrix, and Arrangement"
+          >
+            <option value="harmony">Harmony</option>
+            <option value="drum">Drum</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
       <div className="flex flex-col gap-1">
         {sections.map((s, i) => (
           <div

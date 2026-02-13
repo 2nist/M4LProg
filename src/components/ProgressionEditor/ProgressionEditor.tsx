@@ -16,10 +16,11 @@ import { Trash2, Plus, ArrowUp, Copy, Send, Music2, Clock } from "lucide-react";
 import { InputModal, ConfirmModal } from "../Modal";
 import { useProgressionStore } from "@stores/progressionStore";
 import { useHardwareStore } from "@stores/hardwareStore";
-import type { ChordQuality, ChordMetadata } from "@/types/chord";
+import type { Chord, ChordQuality } from "@/types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
+import type { Section } from "@/types/progression";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
-import ProgressionStrip from "./ProgressionStrip";
+import ArrangementLane from "./ArrangementLane";
 import { LoopTimeline } from "./LoopTimeline";
 import { BeatPadContextMenu } from "./BeatPadContextMenu";
 import VelocityCurveDrawer from "./VelocityCurveDrawer";
@@ -110,17 +111,6 @@ const DROP_VOICINGS = [
 ];
 
 // Local interfaces to replace any types
-interface ChordUpdate {
-  notes: number[];
-  duration: number;
-  metadata?: ChordMetadata;
-}
-
-interface SlotPatch {
-  duration?: number;
-  metadata?: Partial<ChordMetadata>;
-}
-
 export function ProgressionEditor() {
   const {
     getCurrentSection,
@@ -137,6 +127,14 @@ export function ProgressionEditor() {
     setMode,
     selectSlot,
     updateCurrentSection,
+    sections,
+    currentSectionIndex,
+    loadSection,
+    createSection,
+    duplicateSection,
+    deleteSection,
+    uiMode,
+    setSections,
   } = useProgressionStore();
   const { openDrawer, setOpenDrawer } = useProgressionStore();
 
@@ -164,15 +162,6 @@ export function ProgressionEditor() {
     beatNumber: number;
   } | null>(null);
   
-  // Strum drag state for Zone 2 beat pads (vertical slider 0-50ms)
-  const [strumDrag, setStrumDrag] = useState<{
-    slotIndex: number;
-    beatNumber: number;
-    startY: number;
-    startStrum: number;
-    clicked: boolean;
-  } | null>(null);
-  
   // Velocity curve drawer state for Zone 1 chord slots
   const [velocityDrawer, setVelocityDrawer] = useState<{
     slotIndex: number;
@@ -181,60 +170,13 @@ export function ProgressionEditor() {
 
   const section = getCurrentSection();
   const progression = section.progression;
+  const uiModeLabel =
+    uiMode === "harmony" ? "Harmony" : uiMode === "drum" ? "Drum" : "Mode";
 
   // Initialize MIDI
   useEffect(() => {
     initializeMIDI();
   }, [initializeMIDI]);
-  
-  // Handle strum drag for Zone 2 beat pads (vertical slider)
-  useEffect(() => {
-    if (!strumDrag) return;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!strumDrag || strumDrag.clicked) return;
-      
-      const deltaY = e.clientY - strumDrag.startY;
-      const strumRange = 50; // 0-50ms
-      const pixelsPerMs = 1.5; // Sensitivity: ~75px for full range
-      const newStrum = Math.max(0, Math.min(strumRange, strumDrag.startStrum - (deltaY / pixelsPerMs)));
-      
-      // Update strum for this beat
-      if (selectedSlot !== null && progression[selectedSlot]) {
-        const chord = progression[selectedSlot];
-        const strum = chord.metadata?.strum || Array(chord.duration).fill(0);
-        strum[strumDrag.beatNumber - 1] = Math.round(newStrum);
-        
-        updateChord(selectedSlot, {
-          ...chord,
-          metadata: {
-            ...chord.metadata,
-            strum,
-          },
-        });
-      }
-    };
-    
-    const handleMouseUp = () => {
-      // If no significant drag occurred, treat as click (set duration)
-      if (strumDrag && strumDrag.clicked && selectedSlot !== null && progression[selectedSlot]) {
-        const chord = progression[selectedSlot];
-        updateChord(selectedSlot, {
-          ...chord,
-          duration: strumDrag.beatNumber,
-        });
-      }
-      setStrumDrag(null);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [strumDrag, selectedSlot, progression, updateChord]);
   
   // Save velocity curve from drawer
   const handleVelocitySave = useCallback((velocities: number[]) => {
@@ -429,6 +371,96 @@ export function ProgressionEditor() {
     [progression],
   );
 
+  const makeChord = useCallback(
+    (root: number, quality: ChordQuality, duration: number): Chord => {
+      const notes = MusicTheory.generateChord({
+        root,
+        quality,
+        inversion: 0,
+        range: { min: 36, max: 84 },
+      });
+      const beatCount = Math.max(1, Math.ceil(duration));
+      return {
+        notes,
+        duration,
+        metadata: {
+          root,
+          quality,
+          inversion: 0,
+          drop: 0,
+          velocities: Array(beatCount).fill(100),
+          gate: Array(beatCount).fill(150),
+          strum: Array(beatCount).fill(0),
+        },
+      };
+    },
+    [],
+  );
+
+  const buildSection = useCallback(
+    (name: string, progressionData: Chord[], repeats = 1, beatsPerBar = 4): Section => ({
+      id: crypto.randomUUID(),
+      name,
+      progression: progressionData,
+      repeats,
+      beatsPerBar,
+      rootHeld: null,
+      currentNotes: [],
+      transitions: { type: "none", length: 1 },
+    }),
+    [],
+  );
+
+  const loadExampleArrangement = useCallback(
+    (exampleId: "stand_by_me" | "blues_12bar") => {
+      if (exampleId === "stand_by_me") {
+        // Known pop form reference (I-vi-IV-V family), adapted for dev diagnostics.
+        const intro = buildSection("Intro", [
+          makeChord(60, "Maj", 4),
+          makeChord(69, "min", 4),
+          makeChord(65, "Maj", 4),
+          makeChord(67, "Maj", 4),
+        ]);
+        const verse = buildSection("Verse", [
+          makeChord(60, "Maj", 4),
+          makeChord(69, "min", 4),
+          makeChord(65, "Maj", 4),
+          makeChord(67, "Maj", 4),
+        ], 2);
+        const chorus = buildSection("Chorus", [
+          makeChord(65, "Maj", 4),
+          makeChord(67, "Maj", 4),
+          makeChord(60, "Maj", 4),
+          makeChord(69, "min", 4),
+        ], 2);
+        setSections([intro, verse, chorus], 0);
+        return;
+      }
+
+      // 12-bar blues in C (known canonical form), split into structural parts.
+      const bars1to4 = buildSection("Blues A (I)", [
+        makeChord(60, "dom7", 4),
+        makeChord(60, "dom7", 4),
+        makeChord(60, "dom7", 4),
+        makeChord(60, "dom7", 4),
+      ]);
+      const bars5to8 = buildSection("Blues B (IV-I)", [
+        makeChord(65, "dom7", 4),
+        makeChord(65, "dom7", 4),
+        makeChord(60, "dom7", 4),
+        makeChord(60, "dom7", 4),
+      ]);
+      const turnaround = buildSection("Turnaround (V-IV-I-V)", [
+        makeChord(67, "dom7", 4),
+        makeChord(65, "dom7", 4),
+        makeChord(60, "dom7", 4),
+        makeChord(67, "dom7", 4),
+      ], 2);
+      setSections([bars1to4, bars5to8, turnaround], 0);
+    },
+    [buildSection, makeChord, setSections],
+  );
+
   return (
     <div className="flex flex-col h-full bg-app">
       {/* Main Content: Left Sidebar + Right Area */}
@@ -503,6 +535,9 @@ export function ProgressionEditor() {
 
           {/* Encoders Card (CC 14-21) */}
           <div className="px-4 py-3 panel border-b">
+            <div className="mb-2 text-[10px] uppercase tracking-wide muted-text font-semibold">
+              {uiModeLabel} Controls
+            </div>
             <div className="flex items-start gap-4">
               <div className="flex-1">
                 <div className="grid grid-cols-4 gap-x-3 gap-y-2">
@@ -758,7 +793,9 @@ export function ProgressionEditor() {
             <div className="mb-2">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Music2 size={14} className="opacity-50" />
-                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Progression</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
+                  {uiModeLabel} Matrix
+                </span>
               </div>
               <div className="grid max-w-full gap-2 grid-cols-16">
                 {Array.from({ length: PAD_COUNT }, (_, i) => {
@@ -800,7 +837,9 @@ export function ProgressionEditor() {
             <div className="mb-2">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <Clock size={14} className="opacity-50" />
-                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">Duration</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
+                  {uiMode === "harmony" ? "Duration" : "Step Length"}
+                </span>
                 {selectedSlot !== null && progression[selectedSlot] && (
                   <span className="text-[9px] opacity-40 ml-1">• Slot {selectedSlot + 1}</span>
                 )}
@@ -812,25 +851,18 @@ export function ProgressionEditor() {
                     selectedSlot !== null ? progression[selectedSlot] : null;
                   const isLit =
                     selectedChord && beatNumber <= selectedChord.duration;
-                  const strumValue = selectedChord?.metadata?.strum?.[beatNumber - 1] ?? 0;
+                  const gateValue = selectedChord?.metadata?.gate?.[beatNumber - 1] ?? 150;
 
                   return (
                     <button
                       key={i}
-                      onMouseDown={(e) => {
+                      onClick={() => {
                         if (selectedSlot === null || !progression[selectedSlot]) return;
-                        e.preventDefault();
-                        setStrumDrag({
-                          slotIndex: selectedSlot,
-                          beatNumber,
-                          startY: e.clientY,
-                          startStrum: strumValue,
-                          clicked: true,
+                        const chord = progression[selectedSlot];
+                        updateChord(selectedSlot, {
+                          ...chord,
+                          duration: beatNumber,
                         });
-                        // After 150ms or any mouse movement, it's a drag not a click
-                        setTimeout(() => {
-                          setStrumDrag(prev => prev ? { ...prev, clicked: false } : null);
-                        }, 150);
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
@@ -849,19 +881,10 @@ export function ProgressionEditor() {
                     w-full h-14 rounded flex flex-col items-center justify-center text-xs font-bold
                     transition-all transform active:scale-95 relative overflow-hidden
                     ${isLit ? "duration-pad-on" : "duration-pad-off"}
-                    ${selectedSlot === null || !progression[selectedSlot] ? "cursor-not-allowed opacity-50" : "hover:brightness-110 cursor-ns-resize"}
+                    ${selectedSlot === null || !progression[selectedSlot] ? "cursor-not-allowed opacity-50" : "hover:brightness-110 cursor-pointer"}
                   `}
-                      title={`Drag vertically for strum (${strumValue}ms) • Click to set duration • Right-click for velocity`}
+                      title={`Click to set duration to ${beatNumber} beats • Right-click for gate/velocity`}
                     >
-                      {/* Strum amount visual indicator - gradient from bottom */}
-                      {strumValue > 0 && isLit && (
-                        <div 
-                          className="absolute inset-0 pointer-events-none"
-                          style={{
-                            background: `linear-gradient(to top, rgba(251, 191, 36, 0.25) 0%, rgba(251, 191, 36, 0.25) ${(strumValue / 50) * 100}%, transparent ${(strumValue / 50) * 100}%)`
-                          }}
-                        />
-                      )}
                       <span className="relative z-10">{beatNumber}</span>
                       {/* Velocity indicator badge */}
                       {selectedChord?.metadata?.velocities?.[beatNumber - 1] !== undefined && 
@@ -870,10 +893,10 @@ export function ProgressionEditor() {
                           V{selectedChord.metadata.velocities[beatNumber - 1]}
                         </span>
                       )}
-                      {/* Strum indicator badge */}
-                      {strumValue > 0 && isLit && (
+                      {/* Gate indicator badge */}
+                      {isLit && (
                         <span className="absolute top-0.5 left-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
-                          S{strumValue}
+                          G{gateValue}
                         </span>
                       )}
                     </button>
@@ -882,40 +905,25 @@ export function ProgressionEditor() {
               </div>
             </div>
 
-            {/* Compact Progression Strip - placed under Duration as a visual reference */}
+            {/* Arrangement Lane (mode-aware structural sketchpad) */}
             <div className="w-full overflow-y-visible overflow-x-hidden pb-6 mt-3">
-              <ProgressionStrip
-                section={section}
-                selectedSlot={selectedSlot}
-                onSelect={(i: number) => {
-                  selectSlot(i);
-                  loadSlotIntoEncoder(i);
+              <ArrangementLane
+                mode={uiMode}
+                sections={sections}
+                currentSectionIndex={currentSectionIndex}
+                onSelectSection={(index: number) => {
+                  loadSection(index);
+                  selectSlot(null);
                 }}
-                compact
-                onUpdateSlot={(idx: number, patch: SlotPatch) => {
-                  const chord = progression[idx];
-                  if (!chord) return;
-                  const merged: ChordUpdate = {
-                    ...chord,
-                    ...patch,
-                    metadata: {
-                      ...(chord.metadata || {}),
-                      ...(patch.metadata || {}),
-                    },
-                  };
-                  updateChord(idx, merged);
-                }}
-                onSetSectionRepeats={(repeats: number) => {
-                  const updated = { ...section, repeats };
+                onSetCurrentSectionRepeats={(repeats: number) => {
+                  const active = useProgressionStore.getState().getCurrentSection();
+                  const updated = { ...active, repeats };
                   updateCurrentSection(updated);
                 }}
-                onSetSectionBeatsPerBar={(beats: number) => {
-                  const updated = { ...section, beatsPerBar: beats };
-                  updateCurrentSection(updated);
-                }}
-                onVelocityDrawerOpen={(chordIndex: number) => {
-                  setVelocityDrawer({ slotIndex: chordIndex, isOpen: true });
-                }}
+                onCreateSection={() => createSection()}
+                onDuplicateSection={(index: number) => duplicateSection(index)}
+                onDeleteSection={(index: number) => deleteSection(index)}
+                onLoadExample={loadExampleArrangement}
               />
             </div>
           </div>
@@ -958,15 +966,26 @@ export function ProgressionEditor() {
           y={beatContextMenu.y}
           beatNumber={beatContextMenu.beatNumber}
           velocity={progression[selectedSlot].metadata?.velocities?.[beatContextMenu.beatNumber - 1] ?? 100}
-          onUpdate={(velocity) => {
+          gate={progression[selectedSlot].metadata?.gate?.[beatContextMenu.beatNumber - 1] ?? 150}
+          onUpdate={({ velocity, gate }) => {
             const chord = progression[selectedSlot];
-            const velocities = chord.metadata?.velocities || Array(chord.duration).fill(100);
+            const bufferLength = Math.max(chord.duration, beatContextMenu.beatNumber);
+            const velocities =
+              chord.metadata?.velocities?.slice(0, bufferLength) ||
+              Array(bufferLength).fill(100);
+            const gateValues =
+              chord.metadata?.gate?.slice(0, bufferLength) ||
+              Array(bufferLength).fill(150);
+            while (velocities.length < bufferLength) velocities.push(100);
+            while (gateValues.length < bufferLength) gateValues.push(150);
             velocities[beatContextMenu.beatNumber - 1] = velocity;
+            gateValues[beatContextMenu.beatNumber - 1] = gate;
             updateChord(selectedSlot, {
               ...chord,
               metadata: {
                 ...chord.metadata,
                 velocities,
+                gate: gateValues,
               },
             });
           }}

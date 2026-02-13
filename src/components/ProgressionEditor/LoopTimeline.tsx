@@ -81,6 +81,12 @@ const getSectionRepeats = (section: SectionData): number => Math.max(1, section.
 const getTotalSectionBeats = (section: SectionData): number =>
   getBaseSectionBeats(section) * getSectionRepeats(section);
 
+const getSectionBarCount = (section: SectionData): number => {
+  const beatsPerBar = Math.max(1, section?.beatsPerBar || 4);
+  const totalBeats = Math.max(1, getTotalSectionBeats(section));
+  return Math.max(1, Math.ceil(totalBeats / beatsPerBar));
+};
+
 const formatSecondsToClock = (totalSeconds: number): string => {
   const safe = Math.max(0, totalSeconds);
   const minutes = Math.floor(safe / 60);
@@ -216,11 +222,9 @@ function SortableSection({
             <div className="section-meta-item">
               <span className="repeat-badge">×{sectionRepeats}</span>
             </div>
-            <div className="section-meta-item">
-              <span>
-                {Math.ceil(
-                  sectionBeats / (section?.beatsPerBar || 4),
-                )}{" "}
+              <div className="section-meta-item">
+                <span>
+                  {getSectionBarCount(section)}{" "}
                 bars
               </span>
             </div>
@@ -318,9 +322,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
               </div>
               <div className="section-meta-item">
                 <span>
-                  {Math.ceil(
-                    sectionBeats / (section?.beatsPerBar || 4),
-                  )}{" "}
+                  {getSectionBarCount(section)}{" "}
                   bars
                 </span>
               </div>
@@ -548,8 +550,7 @@ export function LoopTimeline() {
     const beatInBar = Math.floor(beatIntoSection % beatsPerBar) + 1;
 
     const barsBefore = sections.slice(0, activeSectionIndex).reduce((sum, section) => {
-      const sectionBeats = getTotalSectionBeats(section);
-      return sum + Math.ceil(sectionBeats / (section.beatsPerBar || 4));
+      return sum + getSectionBarCount(section);
     }, 0);
 
     return {
