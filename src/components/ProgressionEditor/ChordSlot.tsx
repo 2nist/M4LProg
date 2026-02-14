@@ -28,12 +28,10 @@ export function ChordSlot({
   patternName,
   onSelect,
   onDelete,
-  onEdit,
+  onEdit: _onEdit,
   onDuplicate,
 }: ChordSlotProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isEditingDuration, setIsEditingDuration] = useState(false);
-  const [durationInput, setDurationInput] = useState(chord.duration.toString());
 
   const analysis = ProgressionManager.analyzeChord(chord);
 
@@ -95,13 +93,7 @@ export function ChordSlot({
 
   const colors = getChordColor();
 
-  const handleDurationChange = (newDuration: string) => {
-    const duration = parseFloat(newDuration);
-    if (!isNaN(duration) && duration > 0) {
-      onEdit?.(index, { ...chord, duration });
-      setIsEditingDuration(false);
-    }
-  };
+  // Duration editing removed from this slot component per design
 
   return (
     <motion.div
@@ -163,10 +155,7 @@ export function ChordSlot({
         )}
       </div>
 
-      {/* Index badge */}
-      <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-7 h-7 index-badge flex items-center justify-center text-xs font-bold shadow">
-        {index + 1}
-      </div>
+      {/* Index badge removed per design (slot numbers hidden) */}
 
       {/* Chord info */}
       <div className="ml-2">
@@ -186,42 +175,7 @@ export function ChordSlot({
           {chord.notes.length > 5 && " ..."}
         </div>
 
-        {/* Duration editor */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs muted-text">Duration:</span>
-          {isEditingDuration ? (
-            <input
-              type="number"
-              step="0.25"
-              min="0.25"
-              value={durationInput}
-              onChange={(e) => setDurationInput(e.target.value)}
-              onBlur={(e) => handleDurationChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleDurationChange(durationInput);
-                } else if (e.key === "Escape") {
-                  setDurationInput(chord.duration.toString());
-                  setIsEditingDuration(false);
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus
-              aria-label="Chord duration in beats"
-              className="w-16 px-2 py-1 input small"
-            />
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditingDuration(true);
-              }}
-              className="px-2 py-1 rounded text-xs font-semibold btn-small"
-            >
-              {chord.duration} {chord.duration === 1 ? "beat" : "beats"}
-            </button>
-          )}
-        </div>
+        {/* Duration removed from chord slot UI per design */}
       </div>
     </motion.div>
   );

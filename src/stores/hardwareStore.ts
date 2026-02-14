@@ -117,9 +117,9 @@ export const useHardwareStore = create<HardwareState>()(
                 metadata: {
                   root: 60,
                   quality: 'Maj', // use `ChordQuality` literal
-                  velocities: [100, 100, 100],
-                  gate: [1, 1, 1],
-                  strum: [0, 0, 0],
+                  velocities: [100, 100, 100, 100],
+                  gate: [150, 150, 150, 150],
+                  strum: [0, 0, 0, 0],
                   drop: 0,
                 },
               };

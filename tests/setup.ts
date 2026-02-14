@@ -1,38 +1,43 @@
 import '@testing-library/jest-dom'
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+// Minimal, resilient test environment shims (avoid using test-framework globals here)
+const _ls = (globalThis as any).localStorage
+if (_ls) {
+  // If a platform provides localStorage (jsdom), patch its methods
+  _ls.getItem = (_key: string) => null
+  _ls.setItem = (_key: string, _value: string) => undefined
+  _ls.removeItem = (_key: string) => undefined
+  _ls.clear = () => undefined
+} else {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (_key: string) => null,
+      setItem: (_key: string, _value: string) => undefined,
+      removeItem: (_key: string) => undefined,
+      clear: () => undefined,
+    },
+    configurable: true,
+  })
 }
-(globalThis as any).localStorage = localStorageMock
 
-// Mock requestAnimationFrame
-;(globalThis as any).requestAnimationFrame = vi.fn((cb) => {
+// Mock requestAnimationFrame / cancelAnimationFrame
+;(globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
   cb(0)
-  return 1
-})
-;(globalThis as any).cancelAnimationFrame = vi.fn()
+  return 1 as any
+}
+;(globalThis as any).cancelAnimationFrame = (_id: number) => undefined
 
-// Mock window object for node environment
-;(globalThis as any).window = {
-  electronAPI: {
-    onOSCMessage: vi.fn(),
-    sendOSC: vi.fn(),
-    off: vi.fn(),
-  },
-} as any
-
-// Mock electron API
-const mockElectronAPI = {
-  onOSCMessage: vi.fn(),
-  sendOSC: vi.fn(),
-  off: vi.fn(),
+// Minimal window shim for Node/jsdom
+if (typeof (globalThis as any).window === 'undefined') {
+  ;(globalThis as any).window = {} as any
 }
 
-// Mock window.electronAPI
+const mockElectronAPI = {
+  onOSCMessage: (_cb: any) => undefined,
+  sendOSC: (_msg: any) => undefined,
+  off: (_cb: any) => undefined,
+}
+
 Object.defineProperty((globalThis as any).window, 'electronAPI', {
   value: mockElectronAPI,
   writable: true,

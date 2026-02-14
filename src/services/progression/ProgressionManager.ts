@@ -124,6 +124,9 @@ export function createEmptySection(name: string = "New Section"): Section {
     id: crypto.randomUUID(),
     name,
     progression: [],
+    modeProgressions: {
+      harmony: [],
+    },
     // default: repeat once, common 4/4 time signature
     repeats: 1,
     beatsPerBar: 4,
@@ -139,10 +142,17 @@ export function createEmptySection(name: string = "New Section"): Section {
  * @returns Cloned section
  */
 export function cloneSection(section: Section): Section {
+  const harmonyProgression = cloneProgression(section.progression);
+  const modeProgressions = section.modeProgressions || {};
   return {
     id: section.id,
     name: section.name,
-    progression: cloneProgression(section.progression),
+    progression: harmonyProgression,
+    modeProgressions: {
+      harmony: cloneProgression(modeProgressions.harmony || harmonyProgression),
+      drum: cloneProgression(modeProgressions.drum || []),
+      other: cloneProgression(modeProgressions.other || []),
+    },
     rootHeld: section.rootHeld,
     // preserve repeats and beatsPerBar when cloning
     repeats: section.repeats || 1,

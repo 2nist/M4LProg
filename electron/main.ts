@@ -125,13 +125,20 @@ const createWindow = () => {
     });
   });
 
-  // Auto-grant MIDI SysEx permissions
+  // WebMIDI in Electron requires both permission check + request handlers.
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission) => {
+      if (permission === "midi" || permission === "midiSysex") {
+        return true;
+      }
+      return false;
+    },
+  );
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback) => {
-      if (permission === "midiSysex") {
+      if (permission === "midi" || permission === "midiSysex") {
         return callback(true);
       }
-      // Default to false for other permissions
       callback(false);
     },
   );

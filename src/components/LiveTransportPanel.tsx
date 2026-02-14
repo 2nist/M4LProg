@@ -1,6 +1,28 @@
 import { useEffect } from "react";
 import { useLiveStore } from "../stores/liveStore";
 import { useProgressionStore } from "../stores/progressionStore";
+import {
+  buildArrangedChordEvents,
+  toOscProgression,
+} from "../services/output/ArrangementOutput";
+import { getAdapterById } from "../services/output/OutputAdapters";
+import { useRoutingStore } from "../stores/routingStore";
+import { sendArrangedEventsToWebMidi } from "../services/output/WebMidiOutService";
+
+const NOTE_NAMES = [
+  "C",
+  "C#",
+  "D",
+  "D#",
+  "E",
+  "F",
+  "F#",
+  "G",
+  "G#",
+  "A",
+  "A#",
+  "B",
+];
 
 /**
  * Live Transport Panel
@@ -17,16 +39,54 @@ export function LiveTransportPanel() {
     selectTrack,
   } = useLiveStore();
 
-  const { getCurrentSection } = useProgressionStore();
+  const { sections, arrangementBlocks } = useProgressionStore();
+  const oscOutRoute = useRoutingStore((s) => s.oscOutRoute);
+  const midiOutRoute = useRoutingStore((s) => s.midiOutRoute);
+  const midiOutDeviceId = useRoutingStore((s) => s.midiOutDeviceId);
+  const midiOutChannel = useRoutingStore((s) => s.midiOutChannel);
+  const modeDefaultChannels = useRoutingStore((s) => s.modeDefaultChannels);
+  const pulseMidiOut = useRoutingStore((s) => s.pulseMidiOut);
+  const setMidiOutSignal = useRoutingStore((s) => s.setMidiOutSignal);
+  const pushConnectionEvent = useRoutingStore((s) => s.pushConnectionEvent);
 
   useEffect(() => {
     // Auto-connect on mount
     initializeOSC();
   }, [initializeOSC]);
 
-  const handleSendToLive = () => {
-    const currentSection = getCurrentSection();
-    createProgression(currentSection.progression);
+  const handleSendToLive = async () => {
+    const route = getAdapterById(oscOutRoute);
+    const events = buildArrangedChordEvents(sections, arrangementBlocks);
+    const progression = toOscProgression(events);
+    if (route && route.availability === "available") {
+      createProgression(progression);
+      pushConnectionEvent(
+        "osc",
+        `sent ${progression.length} items (${events.length} events)`,
+      );
+    }
+
+    const midiRoute = getAdapterById(midiOutRoute);
+    if (midiRoute && midiRoute.availability === "available") {
+      await sendArrangedEventsToWebMidi(events, {
+        outputId: midiOutDeviceId,
+        channel: midiOutChannel,
+        modeChannels: modeDefaultChannels,
+        onEventSent: pulseMidiOut,
+        onSignal: ({ type, note, channel, velocity }) => {
+          if (type === "all_off") {
+            setMidiOutSignal(`all off ch${channel}`);
+            return;
+          }
+          const noteLabel =
+            typeof note === "number"
+              ? `${NOTE_NAMES[note % 12]}${Math.floor(note / 12) - 1}`
+              : "note";
+          const vel = typeof velocity === "number" ? velocity : 0;
+          setMidiOutSignal(`${type} ${noteLabel} v${vel} ch${channel}`);
+        },
+      });
+    }
   };
 
   return (

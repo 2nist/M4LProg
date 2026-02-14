@@ -35,6 +35,7 @@ import usePlayheadSync from "../../hooks/usePlayheadSync";
 import { computePxPerBeat } from "../../utils/pxPerBeat";
 import { useProgressionStore } from "../../stores/progressionStore";
 import { useLiveStore } from "../../stores/liveStore";
+import type { ArrangementBlock } from "../../types/arrangement";
 import "./timeline-analog.css";
 
 // Helper to convert MIDI note to name (module-scoped so static components can use it)
@@ -80,6 +81,12 @@ const getSectionRepeats = (section: SectionData): number => Math.max(1, section.
 
 const getTotalSectionBeats = (section: SectionData): number =>
   getBaseSectionBeats(section) * getSectionRepeats(section);
+
+const getSectionBarCount = (section: SectionData): number => {
+  const beatsPerBar = Math.max(1, section?.beatsPerBar || 4);
+  const totalBeats = Math.max(1, getTotalSectionBeats(section));
+  return Math.max(1, Math.ceil(totalBeats / beatsPerBar));
+};
 
 const formatSecondsToClock = (totalSeconds: number): string => {
   const safe = Math.max(0, totalSeconds);
@@ -216,11 +223,9 @@ function SortableSection({
             <div className="section-meta-item">
               <span className="repeat-badge">×{sectionRepeats}</span>
             </div>
-            <div className="section-meta-item">
-              <span>
-                {Math.ceil(
-                  sectionBeats / (section?.beatsPerBar || 4),
-                )}{" "}
+              <div className="section-meta-item">
+                <span>
+                  {getSectionBarCount(section)}{" "}
                 bars
               </span>
             </div>
@@ -318,9 +323,7 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
               </div>
               <div className="section-meta-item">
                 <span>
-                  {Math.ceil(
-                    sectionBeats / (section?.beatsPerBar || 4),
-                  )}{" "}
+                  {getSectionBarCount(section)}{" "}
                   bars
                 </span>
               </div>
@@ -437,7 +440,11 @@ const TimelineSectionsStatic = memo(function TimelineSectionsStatic({
 });
 
 export function LoopTimeline() {
-  const { sections, reorderSection } = useProgressionStore();
+  const sections = useProgressionStore((s) => s.sections);
+  const arrangementBlocks = useProgressionStore((s) => s.arrangementBlocks);
+  const reorderArrangementBlock = useProgressionStore(
+    (s) => s.reorderArrangementBlock,
+  );
   const { play, pause, jumpByBars, jumpToBeat, isConnected, transport } = useLiveStore();
 
   const { mode, height, isDragging, changeMode, toggle, handlers } =
@@ -481,10 +488,24 @@ export function LoopTimeline() {
 
   // (bar/beat calculation happens after playhead is available)
 
-  // Calculate cumulative beat positions for each section
+  const timelineSections = useMemo(() => {
+    const sectionMap = new Map(sections.map((section) => [section.id, section]));
+    return arrangementBlocks.map((block: ArrangementBlock) => {
+      const source = sectionMap.get(block.sourceId);
+      return {
+        id: block.id,
+        name: source?.name || block.label || "Section",
+        progression: source?.progression || [],
+        repeats: Math.max(1, block.repeats || source?.repeats || 1),
+        beatsPerBar: source?.beatsPerBar || 4,
+      };
+    });
+  }, [arrangementBlocks, sections]);
+
+  // Calculate cumulative beat positions for each timeline block
   const sectionBeatPositions = useMemo(() => {
     let cumulativeBeat = 0;
-    return sections.map((section) => {
+    return timelineSections.map((section) => {
       const sectionStartBeat = cumulativeBeat;
       const sectionBeats = getTotalSectionBeats(section);
       cumulativeBeat += sectionBeats;
@@ -494,7 +515,7 @@ export function LoopTimeline() {
         totalBeats: sectionBeats,
       };
     });
-  }, [sections]);
+  }, [timelineSections]);
 
   // Calculate total beats in progression for looping
   const totalBeats = useMemo(
@@ -541,22 +562,21 @@ export function LoopTimeline() {
       return { currentBar: 1, currentBeatInBar: 1 };
     }
 
-    const activeSection = sections[activeSectionIndex];
+    const activeSection = timelineSections[activeSectionIndex];
     const beatsPerBar = activeSection?.beatsPerBar || 4;
     const beatIntoSection = loopedBeat - sectionBeatPositions[activeSectionIndex].startBeat;
     const barInSection = Math.floor(beatIntoSection / beatsPerBar) + 1;
     const beatInBar = Math.floor(beatIntoSection % beatsPerBar) + 1;
 
-    const barsBefore = sections.slice(0, activeSectionIndex).reduce((sum, section) => {
-      const sectionBeats = getTotalSectionBeats(section);
-      return sum + Math.ceil(sectionBeats / (section.beatsPerBar || 4));
+    const barsBefore = timelineSections.slice(0, activeSectionIndex).reduce((sum, section) => {
+      return sum + getSectionBarCount(section);
     }, 0);
 
     return {
       currentBar: barsBefore + barInSection,
       currentBeatInBar: beatInBar,
     };
-  }, [currentBeat, sectionBeatPositions, sections, totalBeats]);
+  }, [currentBeat, sectionBeatPositions, timelineSections, totalBeats]);
 
   useEffect(() => {
     currentBeatRef.current = currentBeat;
@@ -646,7 +666,7 @@ export function LoopTimeline() {
     const onResize = () => refreshCycleMetrics();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [refreshCycleMetrics, sections, pixelsPerBeat, mode]);
+  }, [refreshCycleMetrics, timelineSections, pixelsPerBeat, mode]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -663,7 +683,7 @@ export function LoopTimeline() {
     targetScrollLeftRef.current = start;
     cycleOffsetRef.current = 0;
     hasCenteredInitialScrollRef.current = true;
-  }, [sections, pixelsPerBeat, refreshCycleMetrics]);
+  }, [timelineSections, pixelsPerBeat, refreshCycleMetrics]);
 
   useEffect(() => {
     const now = performance.now();
@@ -846,9 +866,9 @@ export function LoopTimeline() {
   const handleDragEnd = useCallback(
     (fromIndex: number, toIndex: number) => {
       if (fromIndex === toIndex) return;
-      reorderSection(fromIndex, toIndex);
+      reorderArrangementBlock(fromIndex, toIndex);
     },
-    [reorderSection],
+    [reorderArrangementBlock],
   );
 
   // Use the stable module-scoped TimelineSectionsStatic component to avoid remounting
@@ -958,8 +978,8 @@ export function LoopTimeline() {
           <div className="timeline-track-wrapper">
             <div className="timeline-track" ref={scrollContainerRef}>
               {/* use the memoized TimelineSections component to reduce re-renders */}
-              <TimelineSections
-                sections={sections}
+                <TimelineSections
+                sections={timelineSections}
                 pixelsPerBeat={pixelsPerBeat}
                 getActiveBeatInSection={getActiveBeatInSection}
                 handleDragEnd={handleDragEnd}

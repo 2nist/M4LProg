@@ -16,7 +16,6 @@ type Props = {
   onSelectSlot?: (index: number) => void;
   compact?: boolean;
   // optional update callbacks when using section
-  onUpdateSlot?: (index: number, patch: Partial<Chord>) => void;
   onSetSectionRepeats?: (repeats: number) => void;
   onSetSectionBeatsPerBar?: (beats: number) => void;
   // Velocity drawer callback
@@ -65,8 +64,6 @@ export default function ProgressionStrip(props: Props) {
     onSelect,
     onSelectSlot,
     compact: _compact = true,
-    // onUpdateSlot (kept in Props for external use) is not used here
-    onUpdateSlot,
     onSetSectionRepeats,
     onSetSectionBeatsPerBar,
     onVelocityDrawerOpen,
@@ -204,111 +201,8 @@ export default function ProgressionStrip(props: Props) {
 
   return (
     <div className="w-full mt-3 overflow-y-hidden" ref={containerRef}>
-      <div
-        ref={scrollRef}
-        className="flex gap-2 overflow-x-auto overflow-y-visible pb-6 cursor-grab active:cursor-grabbing select-none"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <div
-          className={`flex items-end gap-2 mt-2.5 ps-container-${instanceId}`}
-        >
-          {progression.map((chord, idx) => {
-            const isSel = selected === idx;
-            const quality = chord.metadata?.quality as any;
-            const root =
-              typeof chord?.metadata?.root === "number"
-                ? chord.metadata!.root!
-                : 60;
-            const isEmpty = !(chord && (chord.notes || []).length);
-            return (
-              <div
-                key={idx}
-                className={`relative ps-slot-${instanceId}-${idx}`}
-              >
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSelect(idx)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onVelocityDrawerOpen?.(idx);
-                  }}
-                  className={`h-20 w-full px-2 pt-0 pb-2 rounded-lg text-left transition-all flex flex-col ${getPadColor(
-                    quality,
-                  )} ${isSel ? "ring-2 ring-white shadow-lg scale-105" : "hover:brightness-110"}`}
-                  title={`Slot ${idx + 1} - ${NOTE_NAMES[root % 12]} ${quality || ""}`}
-                  aria-pressed={isSel}
-                >
-                  <div className="w-full flex justify-between h-5 gap-0.5 p-0.5">
-                    {Array.from({ length: chord.duration || 1 }, (_, beatIdx) => {
-                      const gate = chord.metadata?.gate || [];
-                      const isLegato = (gate[beatIdx] ?? 150) > 100;
-                      const velocity = chord.metadata?.velocities?.[beatIdx] ?? 100;
-                      const heightPercent = (velocity / 127) * 100;
-                      
-                      return (
-                        <div
-                          key={beatIdx}
-                          className={`flex-1 h-full rounded-sm transition-all cursor-pointer ${
-                            isLegato 
-                              ? 'bg-green-500 opacity-80 hover:opacity-100' 
-                              : 'bg-red-500 opacity-60 hover:opacity-80'
-                          }`}
-                          style={{
-                            minHeight: `${Math.max(20, heightPercent * 0.3)}%`
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Toggle break for this beat (default is legato)
-                            const newGate = [...(chord.metadata?.gate || Array(chord.duration).fill(150))];
-                            newGate[beatIdx] = (newGate[beatIdx] ?? 150) > 100 ? 100 : 150;
-                            onUpdateSlot?.(idx, {
-                              metadata: {
-                                ...chord.metadata,
-                                gate: newGate
-                              }
-                            });
-                          }}
-                          title={`Beat ${beatIdx + 1}: ${isLegato ? 'Legato (click to break)' : 'Break (click for legato)'} • Vel: ${velocity}`}
-                        />
-                      );
-                    })}
-                  </div>
-                  <div className="flex-1 flex flex-col justify-center items-center text-center">
-                    <div
-                      className={`font-semibold text-sm ${isEmpty ? "opacity-40 italic" : ""}`}
-                    >
-                      {isEmpty
-                        ? "Empty"
-                        : `${NOTE_NAMES[root % 12]}${quality || ""}`}
-                    </div>
-                    {!isEmpty && (
-                      <div className="text-xs opacity-75 mt-1">
-                        {(chord.notes || [])
-                          .map((n) => NOTE_NAMES[n % 12])
-                          .join(", ")}
-                      </div>
-                    )}
-                  </div>
-                </motion.button>
-
-                {/* per-slot repeat removed — repeats are section-level */}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Bottom controls bar - Zoom and Parameters */}
-      <div className="flex items-center gap-8 py-3 px-4 mt-2 border-t border-border bg-surface/30 rounded-lg">
+      {/* Top controls bar - Zoom and Parameters */}
+      <div className="flex items-center gap-8 py-3 px-4 mb-2 border-b border-border bg-surface/30 rounded-lg">
         {/* Zoom control */}
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase tracking-wide muted-text font-medium">Zoom</span>
@@ -369,6 +263,97 @@ export default function ProgressionStrip(props: Props) {
             className="progression-param-slider"
           />
           <span className="text-xs muted-text font-mono w-6 text-center">{section?.beatsPerBar || 4}</span>
+        </div>
+      </div>
+
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto overflow-y-visible pb-6 cursor-grab active:cursor-grabbing select-none"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          className={`flex items-end gap-2 mt-2.5 ps-container-${instanceId}`}
+        >
+          {progression.map((chord, idx) => {
+            const isSel = selected === idx;
+            const quality = chord.metadata?.quality as any;
+            const root =
+              typeof chord?.metadata?.root === "number"
+                ? chord.metadata!.root!
+                : 60;
+            const isEmpty = !(chord && (chord.notes || []).length);
+            return (
+              <div
+                key={idx}
+                className={`relative ps-slot-${instanceId}-${idx}`}
+              >
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSelect(idx)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onVelocityDrawerOpen?.(idx);
+                  }}
+                  className={`h-20 w-full px-2 pt-0 pb-2 rounded-lg text-left transition-all flex flex-col ${getPadColor(
+                    quality,
+                  )} ${isSel ? "ring-2 ring-white shadow-lg scale-105" : "hover:brightness-110"}`}
+                  title={`Slot ${idx + 1} - ${NOTE_NAMES[root % 12]} ${quality || ""}`}
+                  aria-pressed={isSel}
+                >
+                  <div className="w-full flex justify-between h-5 gap-0.5 p-0.5">
+                    {Array.from({ length: chord.duration || 1 }, (_, beatIdx) => {
+                      const gate = chord.metadata?.gate || [];
+                      const isLegato = (gate[beatIdx] ?? 150) > 100;
+                      const velocity = chord.metadata?.velocities?.[beatIdx] ?? 100;
+                      const heightPercent = (velocity / 127) * 100;
+                      
+                      return (
+                        <div
+                          key={beatIdx}
+                          className={`flex-1 h-full rounded-sm transition-all ${
+                            isLegato 
+                              ? 'bg-green-500 opacity-80 hover:opacity-100' 
+                              : 'bg-red-500 opacity-60 hover:opacity-80'
+                          }`}
+                          style={{
+                            minHeight: `${Math.max(20, heightPercent * 0.3)}%`
+                          }}
+                          title={`Beat ${beatIdx + 1}: ${isLegato ? 'Legato' : 'Break'} • Vel: ${velocity}`}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="flex-1 flex flex-col justify-center items-center text-center">
+                    <div
+                      className={`font-semibold text-sm ${isEmpty ? "opacity-40 italic" : ""}`}
+                    >
+                      {isEmpty
+                        ? "Empty"
+                        : `${NOTE_NAMES[root % 12]}${quality || ""}`}
+                    </div>
+                    {!isEmpty && (
+                      <div className="text-xs opacity-75 mt-1">
+                        {(chord.notes || [])
+                          .map((n) => NOTE_NAMES[n % 12])
+                          .join(", ")}
+                      </div>
+                    )}
+                  </div>
+                </motion.button>
+
+                {/* per-slot repeat removed — repeats are section-level */}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

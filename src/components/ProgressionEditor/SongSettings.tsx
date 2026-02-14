@@ -1,10 +1,23 @@
 import { useState } from "react";
 import { useProgressionStore } from "@stores/progressionStore";
 import { useHardwareStore } from "@stores/hardwareStore";
+import { useLiveStore } from "@stores/liveStore";
+import {
+  createArrangementSnapshot,
+  toMidiFileBytes,
+  triggerBrowserDownload,
+} from "@services/output/ArrangementOutput";
+import { getAdapterById } from "@services/output/OutputAdapters";
+import { useRoutingStore } from "@stores/routingStore";
 
 export default function SongSettings() {
-  const { saveProgression, setKeyRoot, keyRoot } = useProgressionStore();
+  const { saveProgression, setKeyRoot, keyRoot, sections, arrangementBlocks } =
+    useProgressionStore();
   const { isConnected, initializeMIDI } = useHardwareStore();
+  const transport = useLiveStore((s) => s.transport);
+  const jsonExportRoute = useRoutingStore((s) => s.jsonExportRoute);
+  const midiExportRoute = useRoutingStore((s) => s.midiExportRoute);
+  const pushConnectionEvent = useRoutingStore((s) => s.pushConnectionEvent);
 
   const [title, setTitle] = useState<string>("Untitled Song");
   const [tempo, setTempo] = useState<number>(120);
@@ -20,19 +33,42 @@ export default function SongSettings() {
     alert("Saved progression: " + title);
   };
 
-  const handleExport = () => {
-    const store = useProgressionStore.getState();
-    const snapshot = {
-      sections: store.sections,
-      meta: { title, tempo, timeSig, keyRoot: store.keyRoot },
-    };
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title.replace(/\s+/g, "_") || "progression"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportJson = () => {
+    const route = getAdapterById(jsonExportRoute);
+    if (!route || route.availability !== "available") {
+      console.warn("JSON export route is not available:", jsonExportRoute);
+      return;
+    }
+    const snapshot = createArrangementSnapshot({
+      sections,
+      blocks: arrangementBlocks,
+      tempo: transport?.tempo || tempo,
+      timeSignature: timeSig,
+    });
+    const filename = `${title.replace(/\s+/g, "_") || "arrangement"}.json`;
+    triggerBrowserDownload(filename, JSON.stringify(snapshot, null, 2), "application/json");
+    pushConnectionEvent("file", `exported JSON: ${filename}`);
+  };
+
+  const handleExportMidi = () => {
+    const route = getAdapterById(midiExportRoute);
+    if (!route || route.availability !== "available") {
+      console.warn("MIDI export route is not available:", midiExportRoute);
+      return;
+    }
+    const snapshot = createArrangementSnapshot({
+      sections,
+      blocks: arrangementBlocks,
+      tempo: transport?.tempo || tempo,
+      timeSignature: timeSig,
+    });
+    const midiBytes = toMidiFileBytes(snapshot.events, {
+      tempo: snapshot.tempo,
+      timeSignature: snapshot.timeSignature,
+    });
+    const filename = `${title.replace(/\s+/g, "_") || "arrangement"}.mid`;
+    triggerBrowserDownload(filename, midiBytes, "audio/midi");
+    pushConnectionEvent("file", `exported MIDI: ${filename}`);
   };
 
   return (
@@ -98,8 +134,12 @@ export default function SongSettings() {
             Save Progression
           </button>
 
-          <button className="flex-1 btn-muted px-3 py-1" onClick={handleExport}>
-            Export
+          <button className="flex-1 btn-muted px-3 py-1" onClick={handleExportJson}>
+            Export JSON
+          </button>
+
+          <button className="flex-1 btn-muted px-3 py-1" onClick={handleExportMidi}>
+            Export MIDI
           </button>
         </div>
 

@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 
 interface ModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     };
   }, [isOpen, onClose]);
 
-  return (
+  const modalTree = (
     <AnimatePresence>
       {isOpen && (
         <>
@@ -75,6 +76,12 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === "undefined") {
+    return modalTree;
+  }
+
+  return createPortal(modalTree, document.body);
 }
 
 interface InputModalProps {
