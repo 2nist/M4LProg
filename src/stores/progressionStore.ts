@@ -15,10 +15,67 @@ import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import type { ArrangementBlock, ModeId } from "@/types/arrangement";
 import * as ProgressionManager from "@services/progression/ProgressionManager";
 
-const getSectionBaseBeats = (section: Section): number =>
+const getSectionProgression = (
+  section: Section,
+  mode: ModeId,
+): Progression => {
+  const modeProgression = section.modeProgressions?.[mode];
+  if (Array.isArray(modeProgression)) return modeProgression;
+  if (mode === "harmony") return section.progression || [];
+  return [];
+};
+
+const setSectionProgression = (
+  section: Section,
+  mode: ModeId,
+  progression: Progression,
+): Section => {
+  const nextProgression = ProgressionManager.cloneProgression(progression);
+  const modeProgressions = {
+    ...(section.modeProgressions || {}),
+    [mode]: nextProgression,
+  } as NonNullable<Section["modeProgressions"]>;
+
+  if (!Array.isArray(modeProgressions.harmony)) {
+    modeProgressions.harmony = ProgressionManager.cloneProgression(
+      section.progression || [],
+    );
+  }
+
+  return {
+    ...section,
+    progression:
+      mode === "harmony"
+        ? nextProgression
+        : ProgressionManager.cloneProgression(
+            modeProgressions.harmony || section.progression || [],
+          ),
+    modeProgressions,
+  };
+};
+
+const normalizeSection = (section: Section): Section => {
+  const harmony = ProgressionManager.cloneProgression(section.progression || []);
+  return {
+    ...section,
+    progression: harmony,
+    modeProgressions: {
+      harmony: ProgressionManager.cloneProgression(
+        section.modeProgressions?.harmony || harmony,
+      ),
+      drum: ProgressionManager.cloneProgression(section.modeProgressions?.drum || []),
+      other: ProgressionManager.cloneProgression(section.modeProgressions?.other || []),
+    },
+  };
+};
+
+const getSectionBaseBeats = (section: Section, mode: ModeId): number =>
   Math.max(
     1,
-    section.progression.reduce((sum, chord) => sum + (chord.duration || 0), 0),
+    getSectionProgression(section, mode).reduce(
+      (sum, chord) => sum + (chord.duration || 0),
+      0,
+    ),
   );
 
 const sanitizeMidiChannel = (value?: number): number | undefined => {
@@ -39,7 +96,7 @@ const normalizeArrangementBlocks = (
     let startBeat = 0;
     filtered = sections.map((section) => {
       const repeats = Math.max(1, section.repeats || 1);
-      const lengthBeats = getSectionBaseBeats(section) * repeats;
+      const lengthBeats = getSectionBaseBeats(section, fallbackMode) * repeats;
       const block: ArrangementBlock = {
         id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
         sourceId: section.id,
@@ -59,7 +116,11 @@ const normalizeArrangementBlocks = (
   return filtered.map((block) => {
     const section = sectionMap.get(block.sourceId);
     const repeats = Math.max(1, block.repeats || section?.repeats || 1);
-    const baseBeats = Math.max(1, section ? getSectionBaseBeats(section) : 4);
+    const effectiveMode = block.mode || fallbackMode;
+    const baseBeats = Math.max(
+      1,
+      section ? getSectionBaseBeats(section, effectiveMode) : 4,
+    );
     const lengthBeats = baseBeats * repeats;
     const next: ArrangementBlock = {
       ...block,
@@ -323,7 +384,7 @@ export const useProgressionStore = create<ProgressionState>()(
           sourceId: section.id,
           mode: mode || uiMode,
           startBeat: 0,
-          lengthBeats: getSectionBaseBeats(section) * repeats,
+          lengthBeats: getSectionBaseBeats(section, mode || uiMode) * repeats,
           label: section.name || "Section",
           repeats,
           intent: "main",
@@ -439,7 +500,7 @@ export const useProgressionStore = create<ProgressionState>()(
       setSections: (sections: Section[], nextIndex?: number) => {
         const safeSections =
           sections.length > 0
-            ? sections.map((section) => ProgressionManager.cloneSection(section))
+            ? sections.map((section) => normalizeSection(ProgressionManager.cloneSection(section)))
             : [ProgressionManager.createEmptySection("Section 1")];
         const safeIndex = Math.max(
           0,
@@ -465,8 +526,9 @@ export const useProgressionStore = create<ProgressionState>()(
       updateCurrentSection: (section: Section) => {
         const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
         const newSections = [...sections];
-        newSections[currentSectionIndex] =
-          ProgressionManager.cloneSection(section);
+        newSections[currentSectionIndex] = normalizeSection(
+          ProgressionManager.cloneSection(section),
+        );
         set({
           sections: newSections,
           arrangementBlocks: normalizeArrangementBlocks(
@@ -636,59 +698,64 @@ export const useProgressionStore = create<ProgressionState>()(
 
       addChord: (chord: Chord) => {
         const section = get().getCurrentSection();
-        const updatedSection = {
-          ...section,
-          progression: [...section.progression, chord],
-        };
+        const { uiMode } = get();
+        const progression = getSectionProgression(section, uiMode);
+        const updatedSection = setSectionProgression(section, uiMode, [
+          ...progression,
+          chord,
+        ]);
         get().updateCurrentSection(updatedSection);
       },
 
       removeChord: (index: number) => {
         const section = get().getCurrentSection();
-        const updatedSection = {
-          ...section,
-          progression: section.progression.filter((_, i) => i !== index),
-        };
+        const { uiMode } = get();
+        const progression = getSectionProgression(section, uiMode);
+        const updatedSection = setSectionProgression(
+          section,
+          uiMode,
+          progression.filter((_, i) => i !== index),
+        );
         get().updateCurrentSection(updatedSection);
       },
 
       updateChord: (index: number, chord: Chord) => {
         const section = get().getCurrentSection();
-        const newProgression = [...section.progression];
+        const { uiMode } = get();
+        const newProgression = [...getSectionProgression(section, uiMode)];
         newProgression[index] = chord;
-        const updatedSection = {
-          ...section,
-          progression: newProgression,
-        };
+        const updatedSection = setSectionProgression(
+          section,
+          uiMode,
+          newProgression,
+        );
         get().updateCurrentSection(updatedSection);
       },
 
       insertChord: (index: number, chord: Chord) => {
         const section = get().getCurrentSection();
-        const newProgression = [...section.progression];
+        const { uiMode } = get();
+        const newProgression = [...getSectionProgression(section, uiMode)];
         newProgression.splice(index, 0, chord);
-        const updatedSection = {
-          ...section,
-          progression: newProgression,
-        };
+        const updatedSection = setSectionProgression(
+          section,
+          uiMode,
+          newProgression,
+        );
         get().updateCurrentSection(updatedSection);
       },
 
       clearProgression: () => {
         const section = get().getCurrentSection();
-        const updatedSection = {
-          ...section,
-          progression: [],
-        };
+        const { uiMode } = get();
+        const updatedSection = setSectionProgression(section, uiMode, []);
         get().updateCurrentSection(updatedSection);
       },
 
       setProgression: (progression: Progression) => {
         const section = get().getCurrentSection();
-        const updatedSection = {
-          ...section,
-          progression: ProgressionManager.cloneProgression(progression),
-        };
+        const { uiMode } = get();
+        const updatedSection = setSectionProgression(section, uiMode, progression);
         get().updateCurrentSection(updatedSection);
       },
 
@@ -750,9 +817,10 @@ export const useProgressionStore = create<ProgressionState>()(
         metadata?: Partial<ProgressionSnapshot["metadata"]>,
       ) => {
         const section = get().getCurrentSection();
+        const { uiMode } = get();
         const snapshot = ProgressionManager.createProgressionSnapshot(
           name,
-          section.progression,
+          getSectionProgression(section, uiMode),
           metadata,
         );
 

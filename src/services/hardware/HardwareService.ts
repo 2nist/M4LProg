@@ -49,7 +49,15 @@ let input: Input | null = null;
 export async function initializeMIDIAccess(): Promise<boolean> {
   try {
     if (!WebMidi.enabled || !WebMidi.sysexEnabled) {
-      await WebMidi.enable({ sysex: true });
+      try {
+        await WebMidi.enable({ sysex: true });
+      } catch (sysexError) {
+        console.warn(
+          "WebMIDI sysex enable failed, retrying without sysex:",
+          sysexError,
+        );
+        await WebMidi.enable({ sysex: false });
+      }
     }
 
     console.log("SysEx enabled:", WebMidi.sysexEnabled);

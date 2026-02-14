@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FloatingSliderPicker } from '../common/FloatingSliderPicker';
 
 interface BeatPadContextMenuProps {
   /** Position to render menu */
@@ -82,13 +83,13 @@ export function BeatPadContextMenu({
             <span>Velocity</span>
             <span className="font-mono text-yellow">{velocity}</span>
           </label>
-          <input
-            type="range"
-            min="0"
-            max="127"
+          <FloatingSliderPicker
             value={velocity}
-            onChange={(e) => setVelocity(Number(e.target.value))}
-            className="w-full h-2"
+            min={0}
+            max={127}
+            step={1}
+            onChange={setVelocity}
+            ariaLabel="Velocity"
           />
           <div className="flex justify-between mt-0.5 text-[9px] opacity-40">
             <span>0</span>

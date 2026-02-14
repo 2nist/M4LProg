@@ -4,6 +4,7 @@
  */
 
 import { Progression } from "./chord";
+import type { ModeId } from "./arrangement";
 
 /**
  * Transition types between chords or sections
@@ -37,6 +38,8 @@ export interface Section {
 
   /** The chord progression for this section */
   progression: Progression;
+  /** Per-mode sequence buffers (harmony/drum/other) sharing one arrangement timeline */
+  modeProgressions?: Partial<Record<ModeId, Progression>>;
 
   /** How many times this section repeats when rendering the song timeline */
   repeats?: number;

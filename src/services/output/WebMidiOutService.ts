@@ -7,6 +7,21 @@ export interface MidiOutputDevice {
   name: string;
 }
 
+export interface WebMidiOutputDiagnostic {
+  id: string;
+  name: string;
+  manufacturer: string;
+  state: string;
+  connection: string;
+}
+
+export interface WebMidiDebugSnapshot {
+  enabled: boolean;
+  sysexEnabled: boolean;
+  outputCount: number;
+  outputs: WebMidiOutputDiagnostic[];
+}
+
 export interface WebMidiSendOptions {
   outputId?: string | null;
   channel?: number;
@@ -38,9 +53,15 @@ async function ensureEnabled(): Promise<boolean> {
   try {
     await WebMidi.enable({ sysex: true });
     return true;
-  } catch (error) {
-    console.warn("WebMIDI enable failed:", error);
-    return false;
+  } catch (sysexError) {
+    console.warn("WebMIDI sysex enable failed, retrying without sysex:", sysexError);
+    try {
+      await WebMidi.enable({ sysex: false });
+      return true;
+    } catch (error) {
+      console.warn("WebMIDI enable failed:", error);
+      return false;
+    }
   }
 }
 
@@ -51,6 +72,60 @@ export async function listMidiOutputDevices(): Promise<MidiOutputDevice[]> {
     id: output.id,
     name: output.name || "MIDI Output",
   }));
+}
+
+export async function getWebMidiDebugSnapshot(): Promise<WebMidiDebugSnapshot> {
+  const enabled = await ensureEnabled();
+  if (!enabled) {
+    return {
+      enabled: false,
+      sysexEnabled: false,
+      outputCount: 0,
+      outputs: [],
+    };
+  }
+  const outputs = WebMidi.outputs.map((output) => ({
+    id: output.id,
+    name: output.name || "MIDI Output",
+    manufacturer: output.manufacturer || "unknown",
+    state: output.state || "unknown",
+    connection: (output as { connection?: string }).connection || "unknown",
+  }));
+  return {
+    enabled: WebMidi.enabled,
+    sysexEnabled: WebMidi.sysexEnabled,
+    outputCount: outputs.length,
+    outputs,
+  };
+}
+
+export async function sendWebMidiTestNote(options?: {
+  outputId?: string | null;
+  channel?: number;
+  note?: number;
+  velocity?: number;
+  durationMs?: number;
+}): Promise<boolean> {
+  const enabled = await ensureEnabled();
+  if (!enabled) return false;
+  const output = getOutput(options?.outputId);
+  if (!output) {
+    console.warn("No MIDI output available for test note");
+    return false;
+  }
+
+  const channel = clampChannel(options?.channel || 1);
+  const note = clampMidi(options?.note ?? 60);
+  const velocity = clampMidi(options?.velocity ?? 100);
+  const durationMs = Math.max(40, Math.min(4000, Math.floor(options?.durationMs ?? 250)));
+  const statusOn = 0x90 + (channel - 1);
+  const statusOff = 0x80 + (channel - 1);
+
+  output.send([statusOn, note, velocity]);
+  window.setTimeout(() => {
+    output.send([statusOff, note, 0]);
+  }, durationMs);
+  return true;
 }
 
 function getOutput(outputId?: string | null) {

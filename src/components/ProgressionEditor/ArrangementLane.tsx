@@ -17,8 +17,11 @@ type Props = {
   onLoadExample: (exampleId: "stand_by_me" | "blues_12bar") => void;
 };
 
-const getSectionBeats = (section: Section): number =>
-  section.progression.reduce((sum, chord) => sum + (chord.duration || 0), 0);
+const getSectionBeatsForMode = (section: Section, mode: ModeId): number => {
+  const progression =
+    section.modeProgressions?.[mode] || (mode === "harmony" ? section.progression : []);
+  return progression.reduce((sum, chord) => sum + (chord.duration || 0), 0);
+};
 
 export default function ArrangementLane({
   mode,
@@ -222,6 +225,9 @@ export default function ArrangementLane({
               const isActiveSource = sourceIndex === currentSectionIndex;
               const sourceRepeats = Math.max(1, sections[sourceIndex]?.repeats || 1);
               const beatsPerBar = Math.max(1, sections[sourceIndex]?.beatsPerBar || 4);
+              const blockProgression =
+                sections[sourceIndex]?.modeProgressions?.[block.mode] ||
+                (block.mode === "harmony" ? sections[sourceIndex]?.progression || [] : []);
               const markerBeats = Math.max(1, Math.ceil(block.lengthBeats));
               const markerCount = markerBeats + 1; // include right edge boundary
               const barCount = Math.max(1, Math.ceil(block.lengthBeats / beatsPerBar));
@@ -310,7 +316,7 @@ export default function ArrangementLane({
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-[9px] rounded px-1.5 py-0.5 border border-border/70">
-                        {Math.max(0, sections[sourceIndex]?.progression.length || 0)} ch
+                        {Math.max(0, blockProgression.length || 0)} st
                       </span>
                       <span className="text-[9px] muted-text/80 rounded px-1.5 py-0.5 border border-border/60">
                         x{sourceRepeats}
@@ -351,8 +357,11 @@ export default function ArrangementLane({
             {mode === "harmony" ? (
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {sections.map((section, index) => {
-                  const beats = Math.max(1, getSectionBeats(section));
-                  const hasData = section.progression.length > 0;
+                  const beats = Math.max(1, getSectionBeatsForMode(section, mode));
+                  const modeProgression =
+                    section.modeProgressions?.[mode] ||
+                    (mode === "harmony" ? section.progression : []);
+                  const hasData = modeProgression.length > 0;
                   const isActive = index === currentSectionIndex;
                   return (
                     <div
@@ -371,7 +380,7 @@ export default function ArrangementLane({
                           <div className="text-xs font-semibold truncate">{section.name}</div>
                         </div>
                         <div className="text-[10px] muted-text">
-                          {section.progression.length} chords • {beats} beats
+                          {modeProgression.length} steps • {beats} beats
                         </div>
                         <div className="text-[9px] muted-text">
                           {hasData ? "Ready to arrange and edit" : "Empty section - open in Matrix to add progression"}

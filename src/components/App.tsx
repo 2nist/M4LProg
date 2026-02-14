@@ -1,6 +1,6 @@
 import { ProgressionEditor } from "./ProgressionEditor/ProgressionEditor";
 import { initializeRangeProgress } from "../utils/rangeProgress";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, type CSSProperties } from "react";
 import { useProgressionStore } from "@stores/progressionStore";
 import usePlayheadSync from "@hooks/usePlayheadSync";
 import { computePxPerBeat } from "../utils/pxPerBeat";
@@ -13,8 +13,14 @@ import {
   type OutputTargetAdapter,
 } from "@services/output/OutputAdapters";
 import { useRoutingStore, type RoutingKey } from "@stores/routingStore";
-import { listMidiOutputDevices } from "@services/output/WebMidiOutService";
+import {
+  listMidiOutputDevices,
+  getWebMidiDebugSnapshot,
+  sendWebMidiTestNote,
+  type WebMidiDebugSnapshot,
+} from "@services/output/WebMidiOutService";
 import type { ModeId } from "@/types/arrangement";
+import { FloatingOptionPicker } from "./common/FloatingOptionPicker";
 
 const HEADER_GAP_PX = 8;
 const HEADER_TRANSPORT_CORRECTION_ALPHA = 0.12;
@@ -33,6 +39,38 @@ interface HeaderCardData {
 }
 
 type HeaderConnectionType = "osc" | "midi" | "file";
+
+function HeaderModeArc() {
+  const uiMode = useProgressionStore((s) => s.uiMode);
+  const setUiMode = useProgressionStore((s) => s.setUiMode);
+
+  const modeItems: Array<{ id: ModeId; letter: string; title: string }> = [
+    { id: "harmony", letter: "h", title: "Harmony mode" },
+    { id: "drum", letter: "d", title: "Drum mode" },
+    { id: "other", letter: "b", title: "Bass mode (later)" },
+  ];
+
+  return (
+    <div className="header-mode-arc" role="tablist" aria-label="Mode selector">
+      {modeItems.map((mode, index) => {
+        const isActive = uiMode === mode.id;
+        return (
+          <button
+            key={mode.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            className={`header-mode-arc-item arc-${index + 1} ${isActive ? "is-active" : ""}`}
+            title={mode.title}
+            onClick={() => setUiMode(mode.id)}
+          >
+            {mode.letter}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function HeaderConnectionArray() {
   const isOscConnected = useLiveStore((s) => s.isConnected);
@@ -58,6 +96,11 @@ function HeaderConnectionArray() {
   const [midiDevices, setMidiDevices] = useState<
     Array<{ id: string; name: string }>
   >([]);
+  const [midiDeviceScanAt, setMidiDeviceScanAt] = useState<number>(0);
+  const [isMidiDeviceScanning, setIsMidiDeviceScanning] = useState(false);
+  const [midiDebugSnapshot, setMidiDebugSnapshot] =
+    useState<WebMidiDebugSnapshot | null>(null);
+  const [midiTestResult, setMidiTestResult] = useState<string>("idle");
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 120);
@@ -83,15 +126,49 @@ function HeaderConnectionArray() {
     }
   }, [isMidiConnected, pushConnectionEvent]);
 
-  useEffect(() => {
-    if (openModal !== "midi") return;
-    listMidiOutputDevices().then((devices) => {
+  const refreshMidiDevices = useCallback(async () => {
+    setIsMidiDeviceScanning(true);
+    try {
+      const devices = await listMidiOutputDevices();
       setMidiDevices(devices);
-      if (!midiOutDeviceId && devices.length > 0) {
+      const debug = await getWebMidiDebugSnapshot();
+      setMidiDebugSnapshot(debug);
+      setMidiDeviceScanAt(Date.now());
+      const hasCurrent = !!midiOutDeviceId && devices.some((d) => d.id === midiOutDeviceId);
+      if (!hasCurrent && devices.length > 0) {
         setMidiOutDeviceId(devices[0].id);
       }
+      if (devices.length === 0) {
+        setMidiOutDeviceId(null);
+      }
+    } finally {
+      setIsMidiDeviceScanning(false);
+    }
+  }, [midiOutDeviceId, setMidiOutDeviceId]);
+
+  const sendMidiTest = useCallback(async () => {
+    setMidiTestResult("sending...");
+    const ok = await sendWebMidiTestNote({
+      outputId: midiOutDeviceId,
+      channel: midiOutChannel,
+      note: 60,
+      velocity: 108,
+      durationMs: 300,
     });
-  }, [openModal, midiOutDeviceId, setMidiOutDeviceId]);
+    setMidiTestResult(ok ? "sent C4 test note" : "failed");
+    if (ok) {
+      pushConnectionEvent("midi", "test note sent");
+    }
+  }, [midiOutChannel, midiOutDeviceId, pushConnectionEvent]);
+
+  useEffect(() => {
+    if (openModal !== "midi") return;
+    refreshMidiDevices();
+    const timer = window.setInterval(() => {
+      refreshMidiDevices();
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [openModal, refreshMidiDevices]);
 
   const fileRoutes = [
     { key: "jsonExportRoute" as RoutingKey, label: "JSON", routeId: jsonExportRoute },
@@ -121,9 +198,24 @@ function HeaderConnectionArray() {
   const midiDeviceLabel =
     midiDevices.find((device) => device.id === midiOutDeviceId)?.name ||
     (midiOutDeviceId ? "selected" : "none");
+  const midiChannelOptions = useMemo(
+    () =>
+      Array.from({ length: 16 }, (_, i) => {
+        const channel = i + 1;
+        return { value: channel, label: `Ch ${channel}`, shortLabel: `${channel}` };
+      }),
+    [],
+  );
   const signalAgeMs = midiLastSignalAt > 0 ? now - midiLastSignalAt : Infinity;
   const midiSignalDisplay =
     signalAgeMs > 6000 ? "idle" : midiLastSignal;
+  const midiScanAgeMs = midiDeviceScanAt > 0 ? now - midiDeviceScanAt : Infinity;
+  const midiScanLabel =
+    midiDeviceScanAt === 0
+      ? "never"
+      : midiScanAgeMs < 1000
+        ? "just now"
+        : `${Math.round(midiScanAgeMs / 1000)}s ago`;
 
   const renderAdapterOption = (
     adapter: OutputTargetAdapter,
@@ -203,6 +295,27 @@ function HeaderConnectionArray() {
             Input link: {isMidiConnected ? "connected" : "disconnected"}.
           </div>
           <div className="routing-inline-controls">
+            <div className="routing-modal-caption">
+              Discovery: {midiDevices.length} output(s), last scan {midiScanLabel}
+              {isMidiDeviceScanning ? " (scanning...)" : ""}.
+            </div>
+            <button
+              type="button"
+              className="btn-small"
+              onClick={refreshMidiDevices}
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              className="btn-small"
+              onClick={sendMidiTest}
+            >
+              Test Note
+            </button>
+          </div>
+          <div className="routing-modal-caption">Test: {midiTestResult}</div>
+          <div className="routing-inline-controls">
             <label className="routing-inline-label">
               Output Device
               <select
@@ -225,17 +338,13 @@ function HeaderConnectionArray() {
             </label>
             <label className="routing-inline-label">
               Channel
-              <select
-                className="routing-inline-select"
+              <FloatingOptionPicker
+                className="routing-channel-picker"
                 value={midiOutChannel}
-                onChange={(e) => setMidiOutChannel(Number(e.target.value))}
-              >
-                {Array.from({ length: 16 }, (_, i) => i + 1).map((channel) => (
-                  <option key={channel} value={channel}>
-                    Ch {channel}
-                  </option>
-                ))}
-              </select>
+                options={midiChannelOptions}
+                onChange={(next) => setMidiOutChannel(Number(next))}
+                ariaLabel="MIDI output channel"
+              />
             </label>
           </div>
           <div className="routing-group">
@@ -243,25 +352,32 @@ function HeaderConnectionArray() {
             {(["harmony", "drum", "other"] as ModeId[]).map((modeKey) => (
               <label key={modeKey} className="routing-inline-label">
                 {modeKey}
-                <select
-                  className="routing-inline-select"
+                <FloatingOptionPicker
+                  className="routing-channel-picker"
                   value={modeDefaultChannels[modeKey]}
-                  onChange={(e) =>
-                    setModeDefaultChannel(modeKey, Number(e.target.value))
-                  }
-                >
-                  {Array.from({ length: 16 }, (_, i) => i + 1).map((channel) => (
-                    <option key={`${modeKey}-${channel}`} value={channel}>
-                      Ch {channel}
-                    </option>
-                  ))}
-                </select>
+                  options={midiChannelOptions}
+                  onChange={(channel) => setModeDefaultChannel(modeKey, Number(channel))}
+                  ariaLabel={`${modeKey} default MIDI channel`}
+                />
               </label>
             ))}
           </div>
           {getAdaptersByTransport("midi").map((adapter) =>
             renderAdapterOption(adapter, "midiOutRoute", midiOutRoute),
           )}
+          <div className="routing-group">
+            <div className="routing-group-title">WebMIDI Debug</div>
+            <div className="routing-modal-caption">
+              enabled={midiDebugSnapshot?.enabled ? "true" : "false"} | sysex=
+              {midiDebugSnapshot?.sysexEnabled ? "true" : "false"} | outputs=
+              {midiDebugSnapshot?.outputCount ?? 0}
+            </div>
+            {midiDebugSnapshot?.outputs?.map((output) => (
+              <div key={output.id} className="routing-modal-caption">
+                {output.name} ({output.id.slice(0, 8)}) | {output.state} | {output.connection}
+              </div>
+            ))}
+          </div>
         </div>
       </Modal>
 
@@ -466,9 +582,24 @@ function HeaderTimelinePreview() {
 
   const wrappedOffset = cycleWidth > 0 ? (loopedBeat * pixelsPerBeat) % cycleWidth : 0;
   const renderedCards = [...cards, ...cards];
+  const tempo = transport?.tempo || 120;
+  const speedNorm = Math.max(0, Math.min(1, (tempo - 60) / 120));
+  const sweepPhase = totalBeats > 0
+    ? (((loopedBeat % totalBeats) + totalBeats) % totalBeats) / totalBeats
+    : 0;
+  const sweepPosition = 14 + sweepPhase * 72;
+  const sweepOpacity = isPlaying ? 0.14 + speedNorm * 0.18 : 0.08;
+  const sweepWidth = isPlaying ? 18 - speedNorm * 6 : 20;
+  const timelineStyle = {
+    "--header-sweep-pos": `${sweepPosition}%`,
+    "--header-sweep-opacity": `${sweepOpacity.toFixed(3)}`,
+    "--header-sweep-width": `${sweepWidth.toFixed(2)}%`,
+    "--cyl-strength": "1.42",
+    "--cyl-contrast": "1.18",
+  } as CSSProperties;
 
   return (
-    <div className="app-top-header-timeline" aria-hidden="true">
+    <div className="app-top-header-timeline" aria-hidden="true" style={timelineStyle}>
       <div
         className="app-top-header-scroll-strip"
         style={{ transform: `translate3d(${-wrappedOffset}px, 0, 0)` }}
@@ -505,6 +636,7 @@ function App() {
         <HeaderTimelinePreview />
         <div className="app-top-header-menu-layer">
           <div className="header-brand">2nist</div>
+          <HeaderModeArc />
           <div className="header-spacer" />
           <HeaderConnectionArray />
         </div>

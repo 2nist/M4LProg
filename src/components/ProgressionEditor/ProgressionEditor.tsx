@@ -10,7 +10,7 @@
  * - Bank A-H: Song sections (Verse, Chorus, Bridge, etc.)
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 // framer-motion: used in child components (ProgressionStrip), not directly here
 import { Trash2, Plus, ArrowUp, Copy, Send, Music2, Clock } from "lucide-react";
 import { InputModal, ConfirmModal } from "../Modal";
@@ -19,19 +19,24 @@ import { useHardwareStore } from "@stores/hardwareStore";
 import type { Chord, ChordQuality } from "@/types/chord";
 import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import type { Section } from "@/types/progression";
+import type { ModeId } from "@/types/arrangement";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
 import ArrangementLane from "./ArrangementLane";
 import { LoopTimeline } from "./LoopTimeline";
 import { BeatPadContextMenu } from "./BeatPadContextMenu";
 import VelocityCurveDrawer from "./VelocityCurveDrawer";
 import SongOverview from "./SongOverview";
+import SongMetaCard from "./SongMetaCard";
 import ActiveSectionEditor from "./ActiveSectionEditor";
 import SongSettings from "./SongSettings";
 import LeftNavMenu from "./LeftNavMenu";
 import ToolsPanel from "./ToolsPanel";
 import FocusTrap from "../common/FocusTrap";
 import ConnectionMonitorPanel from "./ConnectionMonitorPanel";
+import { FloatingSliderPicker } from "../common/FloatingSliderPicker";
 import { useLiveStore } from "@stores/liveStore";
+import { GroveWandererModule } from "@/modules/drums/GroveWandererModule";
+import { seedGrooveLibrary } from "@/modules/drums/seedGrooveLibrary";
 import {
   buildArrangedChordEvents,
   toOscProgression,
@@ -119,6 +124,13 @@ const DROP_VOICINGS = [
   { value: 23, label: "Drop 2+4" },
 ];
 
+const getSectionProgressionForMode = (section: Section, mode: ModeId): Chord[] => {
+  const modeProgression = section.modeProgressions?.[mode];
+  if (Array.isArray(modeProgression)) return modeProgression;
+  if (mode === "harmony") return section.progression || [];
+  return [];
+};
+
 // Local interfaces to replace any types
 export function ProgressionEditor() {
   const {
@@ -173,6 +185,33 @@ export function ProgressionEditor() {
 
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
+
+  const modeIndex = Math.max(0, MODES.indexOf(encoderState.mode));
+  const qualityIndex = Math.max(0, QUALITIES.indexOf(encoderState.quality));
+  const extensionIndex = Math.max(
+    0,
+    EXTENSIONS.findIndex((entry) => entry.value === encoderState.extension),
+  );
+  const degreeIndex = Math.max(
+    0,
+    DEGREES.findIndex((entry) => entry.value === encoderState.degree),
+  );
+  const dropIndex = Math.max(
+    0,
+    DROP_VOICINGS.findIndex((entry) => entry.value === encoderState.drop),
+  );
+
+  const grooveModuleRef = useRef<GroveWandererModule | null>(null);
+  const [drumComplexity, setDrumComplexity] = useState(52);
+  const [drumChangeRate, setDrumChangeRate] = useState(40);
+  const [drumSwing, setDrumSwing] = useState(10);
+  const [drumHumanization, setDrumHumanization] = useState(12);
+  const [drumBars, setDrumBars] = useState(4);
+  const [drumKickLevel, setDrumKickLevel] = useState(78);
+  const [drumSnareLevel, setDrumSnareLevel] = useState(74);
+  const [drumTopLevel, setDrumTopLevel] = useState(68);
+  const [isDrumPreviewing, setIsDrumPreviewing] = useState(false);
+  const [lastDrumTotalBeats, setLastDrumTotalBeats] = useState(16);
   
   // Context menu state for beat pad MIDI editing (velocity per beat)
   const [beatContextMenu, setBeatContextMenu] = useState<{
@@ -188,7 +227,10 @@ export function ProgressionEditor() {
   } | null>(null);
 
   const section = getCurrentSection();
-  const progression = section.progression;
+  const progression = useMemo(
+    () => getSectionProgressionForMode(section, uiMode),
+    [section, uiMode],
+  );
   const arrangedEvents = useMemo(
     () => buildArrangedChordEvents(sections, arrangementBlocks),
     [sections, arrangementBlocks],
@@ -200,6 +242,59 @@ export function ProgressionEditor() {
   useEffect(() => {
     initializeMIDI();
   }, [initializeMIDI]);
+
+  useEffect(() => {
+    const module = new GroveWandererModule();
+    grooveModuleRef.current = module;
+    module
+      .initialize(seedGrooveLibrary)
+      .catch((err: unknown) => console.warn("GrooveWanderer init failed:", err));
+    return () => {
+      module.destroy().catch(() => undefined);
+      grooveModuleRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const module = grooveModuleRef.current;
+    if (!module) return;
+    const toVelocityScale = (value: number) =>
+      Math.max(0.2, Math.min(1.6, value / 62.5));
+    module.setConfig({
+      tempo: 120,
+      patternLengthBars: drumBars,
+      // Swing/humanize are temporary here; long-term these should be owned by the MIDI FX engine.
+      swing: drumSwing,
+      humanization: drumHumanization,
+      complexity: {
+        kick: drumComplexity,
+        snare: drumComplexity,
+        hats_ride: Math.min(100, drumComplexity + 10),
+        percussion: Math.max(0, drumComplexity - 8),
+      },
+      changeRate: {
+        kick: drumChangeRate,
+        snare: drumChangeRate,
+        hats_ride: Math.min(100, drumChangeRate + 8),
+        percussion: Math.min(100, drumChangeRate + 16),
+      },
+      velocityScale: {
+        kick: toVelocityScale(drumKickLevel),
+        snare: toVelocityScale(drumSnareLevel),
+        hats_ride: toVelocityScale(drumTopLevel),
+        percussion: toVelocityScale(Math.max(0, drumTopLevel - 6)),
+      },
+    });
+  }, [
+    drumBars,
+    drumChangeRate,
+    drumComplexity,
+    drumHumanization,
+    drumKickLevel,
+    drumSnareLevel,
+    drumSwing,
+    drumTopLevel,
+  ]);
   
   // Save velocity curve from drawer
   const handleVelocitySave = useCallback((velocities: number[]) => {
@@ -216,6 +311,101 @@ export function ProgressionEditor() {
       },
     });
   }, [velocityDrawer, progression, updateChord]);
+
+  const applyDrumPatternToSection = useCallback((totalBeats: number, events: Array<{
+    beat: number;
+    note: number;
+    velocity: number;
+  }>) => {
+    const stepCount = Math.max(16, Math.round(totalBeats));
+    const byStep = new Map<number, { notes: Set<number>; velocity: number }>();
+    events.forEach((event) => {
+      const step = Math.max(0, Math.min(stepCount - 1, Math.floor(event.beat)));
+      if (!byStep.has(step)) {
+        byStep.set(step, { notes: new Set<number>(), velocity: event.velocity });
+      }
+      const row = byStep.get(step);
+      if (!row) return;
+      row.notes.add(event.note);
+      row.velocity = Math.max(row.velocity, event.velocity);
+    });
+
+    const nextProgression = [] as Chord[];
+    for (let step = 0; step < stepCount; step += 1) {
+      const row = byStep.get(step);
+      if (!row || row.notes.size === 0) continue;
+      const notes = [...row.notes].sort((a, b) => a - b);
+      nextProgression[step] = {
+        notes,
+        duration: 1,
+        metadata: {
+          root: notes[0],
+          quality: "dom7",
+          velocities: [Math.max(1, Math.min(127, row.velocity))],
+          gate: [100],
+        },
+      };
+    }
+
+    updateCurrentSection({
+      ...section,
+      progression: section.modeProgressions?.harmony || section.progression,
+      modeProgressions: {
+        ...(section.modeProgressions || {}),
+        drum: nextProgression,
+      },
+    });
+    selectSlot(0);
+  }, [section, selectSlot, updateCurrentSection]);
+
+  const handleEvolveDrumPattern = useCallback(() => {
+    const module = grooveModuleRef.current;
+    if (!module) return;
+    const result = module.generatePattern();
+    setLastDrumTotalBeats(result.totalBeats);
+    applyDrumPatternToSection(result.totalBeats, result.events);
+  }, [applyDrumPatternToSection]);
+
+  const handlePreviewDrumPattern = useCallback(async () => {
+    const module = grooveModuleRef.current;
+    if (!module) return;
+    if (isDrumPreviewing) {
+      module.stopPlayback();
+      setIsDrumPreviewing(false);
+      return;
+    }
+    setIsDrumPreviewing(true);
+    const ok = await module.startPlayback({
+      outputId: midiOutDeviceId,
+      midiChannel: modeDefaultChannels.drum || midiOutChannel,
+      modeChannels: modeDefaultChannels,
+    });
+    if (!ok) {
+      setIsDrumPreviewing(false);
+      return;
+    }
+    const timeoutMs = (lastDrumTotalBeats * 60000) / 120 + 180;
+    window.setTimeout(() => {
+      setIsDrumPreviewing(false);
+    }, timeoutMs);
+  }, [isDrumPreviewing, lastDrumTotalBeats, midiOutChannel, midiOutDeviceId, modeDefaultChannels]);
+
+  const handleDrumCustomAction = useCallback(
+    (action: "capture" | "mutate" | "lock" | "reset") => {
+      pushConnectionEvent("drum", `${action} action queued`);
+      if (action === "reset") {
+        setDrumComplexity(52);
+        setDrumChangeRate(40);
+        setDrumSwing(10);
+        setDrumHumanization(12);
+        setDrumBars(4);
+        setDrumKickLevel(78);
+        setDrumSnareLevel(74);
+        setDrumTopLevel(68);
+      }
+    },
+    [pushConnectionEvent],
+  );
 
   // Sync encoder state with store
   useEffect(() => {
@@ -548,7 +738,7 @@ export function ProgressionEditor() {
           {/* Header — Critical info (25%) */}
           <div className="flex-none h-1/4 overflow-hidden">
             <div className="card h-full">
-              <SongOverview />
+              <SongMetaCard />
             </div>
           </div>
 
@@ -613,198 +803,358 @@ export function ProgressionEditor() {
           {/* Header intentionally removed: info moved to left toolbar */}
 
           {/* Encoders Card (CC 14-21) */}
-          <div className="px-4 py-3 panel border-b">
+          <div className="harmony-controls-panel h-1/4 shrink-0 px-4 py-3 panel border-b">
             <div className="mb-2 text-[10px] uppercase tracking-wide muted-text font-semibold">
               {uiModeLabel} Controls
             </div>
             <div className="flex items-start gap-4">
               <div className="flex-1">
-                <div className="grid grid-cols-4 gap-x-3 gap-y-2">
-                  {/* Key/Root */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      {encoderState.degree === 0 ? "Root Note" : "Key"}
-                    </label>
-                    <select
-                      title={encoderState.degree === 0 ? "Root Note" : "Key"}
-                      value={encoderState.keyRoot}
-                      onChange={(e) =>
-                        updateEncoder("keyRoot", Number(e.target.value))
-                      }
-                      className="w-full text-xs rounded px-2 py-1 compact input"
-                    >
-                      {NOTE_NAMES.map((noteName, i) => (
-                        <option key={i} value={60 + i}>
-                          {noteName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Mode/Scale */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Mode/Scale
-                    </label>
-                    <select
-                      title="Mode/Scale"
-                      value={encoderState.mode}
-                      onChange={(e) =>
-                        updateEncoder("mode", e.target.value as ModaleName)
-                      }
-                      className="w-full text-xs rounded px-2 py-1 compact input"
-                    >
-                      {MODES.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                      <option value="Ionian">[Chromatic]</option>
-                    </select>
-                  </div>
-
-                  {/* Chord Quality */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Quality{" "}
-                      {encoderState.degree > 0 && (
-                        <span className="muted-text">(Auto)</span>
-                      )}
-                    </label>
-                    <select
-                      title="Quality"
-                      value={encoderState.quality}
-                      onChange={(e) =>
-                        updateEncoder("quality", e.target.value as ChordQuality)
-                      }
-                      disabled={encoderState.degree > 0}
-                      className="w-full text-xs rounded px-2 py-1 compact input disabled:opacity-50"
-                    >
-                      {QUALITIES.map((q) => (
-                        <option key={q} value={q}>
-                          {q}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Extension */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Extension
-                    </label>
-                    <select
-                      title="Extension"
-                      value={encoderState.extension}
-                      onChange={(e) =>
-                        updateEncoder("extension", Number(e.target.value))
-                      }
-                      className="w-full text-xs rounded px-2 py-1 compact input"
-                    >
-                      {EXTENSIONS.map((e) => (
-                        <option key={e.value} value={e.value}>
-                          {e.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Diatonic Degree */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Diatonic Degree
-                    </label>
-                    <select
-                      title="Diatonic Degree"
-                      value={encoderState.degree}
-                      onChange={(e) =>
-                        updateEncoder("degree", Number(e.target.value))
-                      }
-                      className="w-full h-8 text-xs compact"
-                    >
-                      {DEGREES.map((d) => (
-                        <option key={d.value} value={d.value}>
-                          {d.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="text-[10px] muted-text text-center mt-0.5">
-                      {DEGREES.find(d => d.value === encoderState.degree)?.label || "Root"}
+                {uiMode === "drum" ? (
+                  <div className="harmony-controls-grid grid grid-cols-4 gap-x-3 gap-y-2">
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Complexity</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drum complexity"
+                        value={drumComplexity}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumComplexity}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Change Rate</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drum change rate"
+                        value={drumChangeRate}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumChangeRate}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Swing</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drum swing"
+                        value={drumSwing}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumSwing}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Humanize</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drum humanization"
+                        value={drumHumanization}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumHumanization}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Bars</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drum bars"
+                        value={drumBars}
+                        min={1}
+                        max={8}
+                        step={1}
+                        onChange={setDrumBars}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Kick Lvl</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Kick level"
+                        value={drumKickLevel}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumKickLevel}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Snare Lvl</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Snare level"
+                        value={drumSnareLevel}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumSnareLevel}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">Hat/Perc Lvl</label>
+                      <FloatingSliderPicker
+                        ariaLabel="Hat and percussion level"
+                        value={drumTopLevel}
+                        min={0}
+                        max={100}
+                        step={1}
+                        onChange={setDrumTopLevel}
+                      />
                     </div>
                   </div>
+                ) : (
+                  <div className="harmony-controls-grid grid grid-cols-4 gap-x-3 gap-y-2">
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        {encoderState.degree === 0 ? "Root Note" : "Key"}
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel={encoderState.degree === 0 ? "Root Note" : "Key"}
+                        value={encoderState.keyRoot}
+                        min={60}
+                        max={71}
+                        step={1}
+                        onChange={(next) => updateEncoder("keyRoot", next)}
+                        formatValue={(midiNote) => NOTE_NAMES[(midiNote - 60 + 12) % 12]}
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {NOTE_NAMES[(encoderState.keyRoot - 60 + 12) % 12]}
+                      </div>
+                    </div>
 
-                  {/* Drop Voicing */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Voicing
-                    </label>
-                    <select
-                      title="Drop Voicing"
-                      value={encoderState.drop}
-                      onChange={(e) =>
-                        updateEncoder("drop", Number(e.target.value))
-                      }
-                      className="w-full h-8 text-xs compact"
-                    >
-                      {DROP_VOICINGS.map((v) => (
-                        <option key={v.value} value={v.value}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="text-[10px] muted-text text-center mt-0.5">
-                      {DROP_VOICINGS.find(v => v.value === encoderState.drop)?.label || "Close"}
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Mode/Scale
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Mode/Scale"
+                        value={modeIndex}
+                        min={0}
+                        max={MODES.length - 1}
+                        step={1}
+                        onChange={(next) =>
+                          updateEncoder(
+                            "mode",
+                            MODES[Math.max(0, Math.min(MODES.length - 1, next))],
+                          )
+                        }
+                        formatValue={(index) =>
+                          MODES[Math.max(0, Math.min(MODES.length - 1, index))]
+                        }
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {encoderState.mode}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Quality{" "}
+                        {encoderState.degree > 0 && (
+                          <span className="muted-text">(Auto)</span>
+                        )}
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Quality"
+                        value={qualityIndex}
+                        min={0}
+                        max={QUALITIES.length - 1}
+                        step={1}
+                        onChange={(next) =>
+                          updateEncoder(
+                            "quality",
+                            QUALITIES[
+                              Math.max(0, Math.min(QUALITIES.length - 1, next))
+                            ] as ChordQuality,
+                          )
+                        }
+                        disabled={encoderState.degree > 0}
+                        formatValue={(index) =>
+                          QUALITIES[Math.max(0, Math.min(QUALITIES.length - 1, index))]
+                        }
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {encoderState.quality}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Extension
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Extension"
+                        value={extensionIndex}
+                        min={0}
+                        max={EXTENSIONS.length - 1}
+                        step={1}
+                        onChange={(next) =>
+                          updateEncoder(
+                            "extension",
+                            EXTENSIONS[
+                              Math.max(0, Math.min(EXTENSIONS.length - 1, next))
+                            ].value,
+                          )
+                        }
+                        formatValue={(index) =>
+                          EXTENSIONS[Math.max(0, Math.min(EXTENSIONS.length - 1, index))]
+                            .label
+                        }
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {EXTENSIONS[extensionIndex]?.label || "None"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Diatonic Degree
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Diatonic Degree"
+                        value={degreeIndex}
+                        min={0}
+                        max={DEGREES.length - 1}
+                        step={1}
+                        onChange={(next) =>
+                          updateEncoder(
+                            "degree",
+                            DEGREES[Math.max(0, Math.min(DEGREES.length - 1, next))]
+                              .value,
+                          )
+                        }
+                        formatValue={(index) =>
+                          DEGREES[Math.max(0, Math.min(DEGREES.length - 1, index))]
+                            .label
+                        }
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {DEGREES.find((d) => d.value === encoderState.degree)?.label || "Root"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Voicing
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Drop Voicing"
+                        value={dropIndex}
+                        min={0}
+                        max={DROP_VOICINGS.length - 1}
+                        step={1}
+                        onChange={(next) =>
+                          updateEncoder(
+                            "drop",
+                            DROP_VOICINGS[
+                              Math.max(0, Math.min(DROP_VOICINGS.length - 1, next))
+                            ].value,
+                          )
+                        }
+                        formatValue={(index) =>
+                          DROP_VOICINGS[
+                            Math.max(0, Math.min(DROP_VOICINGS.length - 1, index))
+                          ].label
+                        }
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {DROP_VOICINGS.find((v) => v.value === encoderState.drop)?.label ||
+                          "Close"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Inversion
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Inversion"
+                        value={encoderState.inversion}
+                        min={0}
+                        max={3}
+                        step={1}
+                        onChange={(next) => updateEncoder("inversion", next)}
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {["Root", "1st", "2nd", "3rd"][encoderState.inversion]}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Octave
+                      </label>
+                      <FloatingSliderPicker
+                        ariaLabel="Octave"
+                        value={encoderState.octave}
+                        min={-2}
+                        max={2}
+                        step={1}
+                        onChange={(next) => updateEncoder("octave", next)}
+                      />
+                      <div className="text-[10px] muted-text text-center mt-0.5">
+                        {encoderState.octave > 0
+                          ? `+${encoderState.octave}`
+                          : encoderState.octave}
+                      </div>
                     </div>
                   </div>
-
-                  {/* Inversion */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Inversion
-                    </label>
-                    <input
-                      title="Inversion"
-                      type="range"
-                      min="0"
-                      max="3"
-                      value={encoderState.inversion}
-                      onChange={(e) =>
-                        updateEncoder("inversion", Number(e.target.value))
-                      }
-                      className="w-full h-2 compact"
-                    />
-                    <div className="text-[10px] muted-text text-center mt-0.5">
-                      {["Root", "1st", "2nd", "3rd"][encoderState.inversion]}
-                    </div>
-                  </div>
-
-                  {/* Octave */}
-                  <div>
-                    <label className="text-[10px] muted-text block mb-1">
-                      Octave
-                    </label>
-                    <input
-                      title="Octave"
-                      type="range"
-                      min="-2"
-                      max="2"
-                      value={encoderState.octave}
-                      onChange={(e) =>
-                        updateEncoder("octave", Number(e.target.value))
-                      }
-                      className="w-full h-2 compact"
-                    />
-                    <div className="text-[10px] muted-text text-center mt-0.5">
-                      {encoderState.octave > 0
-                        ? `+${encoderState.octave}`
-                        : encoderState.octave}
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Action Buttons - Two Column Layout */}
-              <div className="w-32 grid grid-cols-2 gap-2 mt-1.5">
+              <div className="harmony-controls-actions w-32 grid grid-cols-2 gap-2 mt-1.5">
+                {uiMode === "drum" && (
+                  <>
+                    <button
+                      onClick={handleEvolveDrumPattern}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Generate and apply drum pattern"
+                    >
+                      <Music2 size={10} />
+                      EVOLVE
+                    </button>
+
+                    <button
+                      onClick={handlePreviewDrumPattern}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Preview generated drum MIDI"
+                    >
+                      <Send size={10} />
+                      {isDrumPreviewing ? "STOP" : "PREVIEW"}
+                    </button>
+
+                    <button
+                      onClick={() => handleDrumCustomAction("capture")}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Capture groove state (placeholder)"
+                    >
+                      CAPTURE
+                    </button>
+
+                    <button
+                      onClick={() => handleDrumCustomAction("mutate")}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Mutate groove (placeholder)"
+                    >
+                      MUTATE
+                    </button>
+
+                    <button
+                      onClick={() => handleDrumCustomAction("lock")}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Lock groove voice lanes (placeholder)"
+                    >
+                      LOCK
+                    </button>
+
+                    <button
+                      onClick={() => handleDrumCustomAction("reset")}
+                      className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
+                      title="Reset drum controls to defaults"
+                    >
+                      RESET
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={handleAdd}
                   className="flex items-center justify-center gap-1 px-2 py-1 text-[8px] font-bold text-black transition-all btn-yellow rounded shadow compact active:scale-95"
@@ -870,13 +1220,13 @@ export function ProgressionEditor() {
           {/* Main Content - Pads Area */}
           <div className="flex-1 px-6 py-2">
             <div className="mb-2">
-              <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="sequencer-lane-header flex items-center gap-1.5 mb-1.5">
                 <Music2 size={14} className="opacity-50" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
                   {uiModeLabel} Matrix
                 </span>
               </div>
-              <div className="grid max-w-full gap-2 grid-cols-16">
+              <div className="sequencer-lane sequencer-lane-harmony grid max-w-full gap-2 grid-cols-16">
                 {Array.from({ length: PAD_COUNT }, (_, i) => {
                   const chord = progression[i];
                   const isSelected = selectedSlot === i;
@@ -895,12 +1245,12 @@ export function ProgressionEditor() {
                         // TODO: Open velocity curve drawer
                         console.log('Open velocity drawer for slot', i);
                       }}
-                      className={`relative w-full h-14 rounded transition-transform flex flex-col items-center justify-center text-xs font-bold compact gap-0.5 ${isEmpty ? "pad-empty" : getPadColor(chord.metadata?.quality)} ${isSelected ? "slot-selected" : ""} hover:brightness-110 active:scale-95`}
+                      className={`sequencer-cell matrix-pad relative w-full h-14 rounded transition-transform flex flex-col items-center justify-center text-xs font-bold compact gap-0.5 ${isEmpty ? "pad-empty sequencer-cell-off" : `matrix-pad-filled sequencer-cell-on ${getPadColor(chord.metadata?.quality)}`} ${isSelected ? "slot-selected matrix-pad-selected" : ""} hover:brightness-110 active:scale-95`}
                       title={`Slot ${i + 1}${chord ? `: ${NOTE_NAMES[(chord.metadata?.root || 0) % 12]}${chord.metadata?.quality}` : " (Empty)"}`}
                     >
-                      <span className="text-[10px] text-black opacity-70">{i + 1}</span>
+                      <span className="matrix-pad-index">{i + 1}</span>
                       {chord && (
-                        <span className="text-[11px] font-bold leading-tight text-black">
+                        <span className="matrix-pad-label text-[11px] font-bold leading-tight">
                           {NOTE_NAMES[(chord.metadata?.root || 0) % 12]}
                           <br />
                           {chord.metadata?.quality || ""}
@@ -914,7 +1264,7 @@ export function ProgressionEditor() {
 
             {/* Lower Pads: Duration Visualization */}
             <div className="mb-2">
-              <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="sequencer-lane-header flex items-center gap-1.5 mb-1.5">
                 <Clock size={14} className="opacity-50" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide opacity-60">
                   {uiMode === "harmony" ? "Duration" : "Step Length"}
@@ -923,19 +1273,39 @@ export function ProgressionEditor() {
                   <span className="text-[9px] opacity-40 ml-1">• Slot {selectedSlot + 1}</span>
                 )}
               </div>
-              <div className="grid gap-2 grid-cols-16">
+              <div className="sequencer-lane sequencer-lane-duration grid gap-2 grid-cols-16">
                 {Array.from({ length: PAD_COUNT }, (_, i) => {
                   const beatNumber = i + 1;
+                  const drumStepChord = progression[i];
                   const selectedChord =
-                    selectedSlot !== null ? progression[selectedSlot] : null;
+                    uiMode === "drum"
+                      ? drumStepChord
+                      : selectedSlot !== null
+                        ? progression[selectedSlot]
+                        : null;
                   const isLit =
-                    selectedChord && beatNumber <= selectedChord.duration;
-                  const gateValue = selectedChord?.metadata?.gate?.[beatNumber - 1] ?? 150;
+                    uiMode === "drum"
+                      ? !!drumStepChord
+                      : !!(selectedChord && beatNumber <= selectedChord.duration);
 
                   return (
                     <button
                       key={i}
                       onClick={() => {
+                        if (uiMode === "drum") {
+                          const chord = progression[i];
+                          if (!chord) return;
+                          const nextDuration =
+                            chord.duration >= 2
+                              ? 0.25
+                              : Number((chord.duration * 2).toFixed(2));
+                          updateChord(i, {
+                            ...chord,
+                            duration: nextDuration,
+                          });
+                          selectSlot(i);
+                          return;
+                        }
                         if (selectedSlot === null || !progression[selectedSlot]) return;
                         const chord = progression[selectedSlot];
                         updateChord(selectedSlot, {
@@ -945,6 +1315,15 @@ export function ProgressionEditor() {
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
+                        if (uiMode === "drum" && progression[i]) {
+                          selectSlot(i);
+                          setBeatContextMenu({
+                            x: e.clientX,
+                            y: e.clientY,
+                            beatNumber: 1,
+                          });
+                          return;
+                        }
                         if (selectedSlot !== null && progression[selectedSlot]) {
                           setBeatContextMenu({
                             x: e.clientX,
@@ -954,28 +1333,36 @@ export function ProgressionEditor() {
                         }
                       }}
                       disabled={
-                        selectedSlot === null || !progression[selectedSlot]
+                        uiMode === "drum"
+                          ? !progression[i]
+                          : selectedSlot === null || !progression[selectedSlot]
                       }
                       className={`
-                    w-full h-14 rounded flex flex-col items-center justify-center text-xs font-bold
-                    transition-all transform active:scale-95 relative overflow-hidden
+                    sequencer-cell sequencer-step-pad w-full h-14 rounded flex flex-col items-center justify-center text-xs font-bold
+                    transition-all transform active:scale-95 relative
                     ${isLit ? "duration-pad-on" : "duration-pad-off"}
                     ${selectedSlot === null || !progression[selectedSlot] ? "cursor-not-allowed opacity-50" : "hover:brightness-110 cursor-pointer"}
                   `}
-                      title={`Click to set duration to ${beatNumber} beats • Right-click for gate/velocity`}
+                      title={
+                        uiMode === "drum"
+                          ? "Click to cycle step length • Right-click for gate/velocity"
+                          : `Click to set duration to ${beatNumber} beats • Right-click for gate/velocity`
+                      }
                     >
-                      <span className="relative z-10">{beatNumber}</span>
+                      <span className="sequencer-step-index relative z-10">{beatNumber}</span>
                       {/* Velocity indicator badge */}
-                      {selectedChord?.metadata?.velocities?.[beatNumber - 1] !== undefined && 
-                       selectedChord.metadata.velocities[beatNumber - 1] !== 100 && isLit && (
+                      {selectedChord?.metadata?.velocities?.[
+                        uiMode === "drum" ? 0 : beatNumber - 1
+                      ] !== undefined &&
+                       selectedChord.metadata.velocities[
+                         uiMode === "drum" ? 0 : beatNumber - 1
+                       ] !== 100 && isLit && (
                         <span className="absolute top-0.5 right-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
-                          V{selectedChord.metadata.velocities[beatNumber - 1]}
-                        </span>
-                      )}
-                      {/* Gate indicator badge */}
-                      {isLit && (
-                        <span className="absolute top-0.5 left-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
-                          G{gateValue}
+                          V{
+                            selectedChord.metadata.velocities[
+                              uiMode === "drum" ? 0 : beatNumber - 1
+                            ]
+                          }
                         </span>
                       )}
                     </button>

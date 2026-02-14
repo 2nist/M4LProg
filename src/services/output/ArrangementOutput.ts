@@ -1,6 +1,7 @@
 import type { Chord } from "@/types/chord";
 import type { ArrangementBlock } from "@/types/arrangement";
 import type { Section } from "@/types/progression";
+import type { ModeId } from "@/types/arrangement";
 
 export interface ArrangedChordEvent {
   blockId: string;
@@ -40,6 +41,17 @@ const clampMidi = (value: number): number =>
 
 const safeDuration = (duration: number): number => Math.max(0.25, duration || 0.25);
 
+const getSectionProgressionForMode = (
+  section: Section,
+  mode: string,
+): Chord[] => {
+  const modeId = mode as ModeId;
+  const modeProgression = section.modeProgressions?.[modeId];
+  if (Array.isArray(modeProgression)) return modeProgression;
+  if (modeId === "harmony") return section.progression || [];
+  return [];
+};
+
 export function buildArrangedChordEvents(
   sections: Section[],
   blocks: ArrangementBlock[],
@@ -50,10 +62,12 @@ export function buildArrangedChordEvents(
 
   for (const block of sortedBlocks) {
     const section = sectionMap.get(block.sourceId);
-    if (!section || !Array.isArray(section.progression)) continue;
+    if (!section) continue;
+    const sectionProgression = getSectionProgressionForMode(section, block.mode);
+    if (!Array.isArray(sectionProgression)) continue;
 
     const blockRepeats = Math.max(1, block.repeats || section.repeats || 1);
-    const sectionLength = section.progression.reduce(
+    const sectionLength = sectionProgression.reduce(
       (sum, chord) => sum + safeDuration(chord.duration),
       0,
     );
@@ -62,7 +76,7 @@ export function buildArrangedChordEvents(
       const repeatOffset = repeatIndex * sectionLength;
       let chordCursor = 0;
 
-      section.progression.forEach((chord: Chord, chordIndex: number) => {
+      sectionProgression.forEach((chord: Chord, chordIndex: number) => {
         const durationBeats = safeDuration(chord.duration);
         const beatIndex = Math.max(0, Math.floor(chordCursor));
         events.push({
