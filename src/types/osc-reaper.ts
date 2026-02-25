@@ -1,11 +1,14 @@
 /**
- * REAPER OSC Message Type Definitions
+ * =============================================================================
+ * REAPER OSC MESSAGE TYPE DEFINITIONS
  * For communication between Electron app and REAPER DAW
  *
  * REAPER OSC Reference: https://www.reaper.fm/sdk/osc/osc.php
+ * =============================================================================
  */
 
-// OSC Message structure
+// ======================= OSC Message Structure =======================
+
 export interface REAPEROSCMessage {
   address: string;
   args: REAPEROSCArgument[];
@@ -13,7 +16,8 @@ export interface REAPEROSCMessage {
 
 export type REAPEROSCArgument = number | string | boolean | Uint8Array;
 
-// REAPER Note structure for MIDI
+// ======================= REAPER Note Structure =======================
+
 export interface REAPERNote {
   pitch: number; // MIDI pitch (0-127)
   startTime: number; // Time in seconds
@@ -22,7 +26,8 @@ export interface REAPERNote {
   channel: number; // MIDI channel (0-15)
 }
 
-// REAPER Track structure
+// ======================= REAPER Track Structure =======================
+
 export interface REAPERTrack {
   index: number;
   name: string;
@@ -33,7 +38,8 @@ export interface REAPERTrack {
   pan: number;
 }
 
-// REAPER Transport state
+// ======================= REAPER Transport State =======================
+
 export interface REAPERTransportState {
   isPlaying: boolean;
   isPaused: boolean;
@@ -44,8 +50,8 @@ export interface REAPERTransportState {
   timeSignatureDenom: number;
 }
 
-// REAPER OSC Address constants
-// Standard REAPER OSC addresses
+// ======================= REAPER OSC Address Constants =======================
+
 export const REAPER_OSC_ADDRESSES = {
   // Transport controls (Electron → REAPER)
   PLAY: "/play",
@@ -111,7 +117,8 @@ export const REAPER_OSC_ADDRESSES = {
   HELLO_ACK: "/helloack",
 } as const;
 
-// Map of friendly names to OSC addresses
+// ======================= REAPER Action Map =======================
+
 export const REAPER_ACTIONS = {
   // Transport
   play: REAPER_OSC_ADDRESSES.PLAY,
@@ -137,7 +144,8 @@ export const REAPER_ACTIONS = {
 export type REAPEROSCAddressType =
   (typeof REAPER_OSC_ADDRESSES)[keyof typeof REAPER_OSC_ADDRESSES];
 
-// Helper function to build track-specific addresses
+// ======================= Helper Functions =======================
+
 export function getTrackAddress(template: string, trackIndex: number): string {
   return template.replace("{n}", trackIndex.toString());
 }

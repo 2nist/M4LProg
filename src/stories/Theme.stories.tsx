@@ -174,7 +174,7 @@ const ThemeShowcase = () => {
       <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: 'var(--muted)', borderRadius: '0.25rem' }}>
         <h3>Active Theme: {activeTheme}</h3>
         <p>
-          Check your browser console: <code>localStorage.setItem('theme-override', JSON.stringify({'{--primary: "#00ff00"}}))</code>
+          Check your browser console: <code>{'localStorage.setItem(\'theme-override\', JSON.stringify({\'--primary\': \'#00ff00\'}))'}</code>
         </p>
       </div>
     </div>

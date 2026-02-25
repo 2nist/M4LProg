@@ -29,6 +29,7 @@ import SongOverview from "./SongOverview";
 import SongMetaCard from "./SongMetaCard";
 import ActiveSectionEditor from "./ActiveSectionEditor";
 import SongSettings from "./SongSettings";
+import SongFormPicker from "./SongFormPicker";
 import LeftNavMenu from "./LeftNavMenu";
 import ToolsPanel from "./ToolsPanel";
 import FocusTrap from "../common/FocusTrap";
@@ -124,7 +125,10 @@ const DROP_VOICINGS = [
   { value: 23, label: "Drop 2+4" },
 ];
 
-const getSectionProgressionForMode = (section: Section, mode: ModeId): Chord[] => {
+const getSectionProgressionForMode = (
+  section: Section,
+  mode: ModeId,
+): Chord[] => {
   const modeProgression = section.modeProgressions?.[mode];
   if (Array.isArray(modeProgression)) return modeProgression;
   if (mode === "harmony") return section.progression || [];
@@ -212,14 +216,14 @@ export function ProgressionEditor() {
   const [drumTopLevel, setDrumTopLevel] = useState(68);
   const [isDrumPreviewing, setIsDrumPreviewing] = useState(false);
   const [lastDrumTotalBeats, setLastDrumTotalBeats] = useState(16);
-  
+
   // Context menu state for beat pad MIDI editing (velocity per beat)
   const [beatContextMenu, setBeatContextMenu] = useState<{
     x: number;
     y: number;
     beatNumber: number;
   } | null>(null);
-  
+
   // Velocity curve drawer state for Zone 1 chord slots
   const [velocityDrawer, setVelocityDrawer] = useState<{
     slotIndex: number;
@@ -248,7 +252,9 @@ export function ProgressionEditor() {
     grooveModuleRef.current = module;
     module
       .initialize(seedGrooveLibrary)
-      .catch((err: unknown) => console.warn("GrooveWanderer init failed:", err));
+      .catch((err: unknown) =>
+        console.warn("GrooveWanderer init failed:", err),
+      );
     return () => {
       module.destroy().catch(() => undefined);
       grooveModuleRef.current = null;
@@ -295,68 +301,86 @@ export function ProgressionEditor() {
     drumSwing,
     drumTopLevel,
   ]);
-  
+
   // Save velocity curve from drawer
-  const handleVelocitySave = useCallback((velocities: number[]) => {
-    if (!velocityDrawer) return;
-    
-    const chord = progression[velocityDrawer.slotIndex];
-    if (!chord) return;
-    
-    updateChord(velocityDrawer.slotIndex, {
-      ...chord,
-      metadata: {
-        ...chord.metadata,
-        velocities,
-      },
-    });
-  }, [velocityDrawer, progression, updateChord]);
+  const handleVelocitySave = useCallback(
+    (velocities: number[]) => {
+      if (!velocityDrawer) return;
 
-  const applyDrumPatternToSection = useCallback((totalBeats: number, events: Array<{
-    beat: number;
-    note: number;
-    velocity: number;
-  }>) => {
-    const stepCount = Math.max(16, Math.round(totalBeats));
-    const byStep = new Map<number, { notes: Set<number>; velocity: number }>();
-    events.forEach((event) => {
-      const step = Math.max(0, Math.min(stepCount - 1, Math.floor(event.beat)));
-      if (!byStep.has(step)) {
-        byStep.set(step, { notes: new Set<number>(), velocity: event.velocity });
-      }
-      const row = byStep.get(step);
-      if (!row) return;
-      row.notes.add(event.note);
-      row.velocity = Math.max(row.velocity, event.velocity);
-    });
+      const chord = progression[velocityDrawer.slotIndex];
+      if (!chord) return;
 
-    const nextProgression = [] as Chord[];
-    for (let step = 0; step < stepCount; step += 1) {
-      const row = byStep.get(step);
-      if (!row || row.notes.size === 0) continue;
-      const notes = [...row.notes].sort((a, b) => a - b);
-      nextProgression[step] = {
-        notes,
-        duration: 1,
+      updateChord(velocityDrawer.slotIndex, {
+        ...chord,
         metadata: {
-          root: notes[0],
-          quality: "dom7",
-          velocities: [Math.max(1, Math.min(127, row.velocity))],
-          gate: [100],
+          ...chord.metadata,
+          velocities,
         },
-      };
-    }
+      });
+    },
+    [velocityDrawer, progression, updateChord],
+  );
 
-    updateCurrentSection({
-      ...section,
-      progression: section.modeProgressions?.harmony || section.progression,
-      modeProgressions: {
-        ...(section.modeProgressions || {}),
-        drum: nextProgression,
-      },
-    });
-    selectSlot(0);
-  }, [section, selectSlot, updateCurrentSection]);
+  const applyDrumPatternToSection = useCallback(
+    (
+      totalBeats: number,
+      events: Array<{
+        beat: number;
+        note: number;
+        velocity: number;
+      }>,
+    ) => {
+      const stepCount = Math.max(16, Math.round(totalBeats));
+      const byStep = new Map<
+        number,
+        { notes: Set<number>; velocity: number }
+      >();
+      events.forEach((event) => {
+        const step = Math.max(
+          0,
+          Math.min(stepCount - 1, Math.floor(event.beat)),
+        );
+        if (!byStep.has(step)) {
+          byStep.set(step, {
+            notes: new Set<number>(),
+            velocity: event.velocity,
+          });
+        }
+        const row = byStep.get(step);
+        if (!row) return;
+        row.notes.add(event.note);
+        row.velocity = Math.max(row.velocity, event.velocity);
+      });
+
+      const nextProgression = [] as Chord[];
+      for (let step = 0; step < stepCount; step += 1) {
+        const row = byStep.get(step);
+        if (!row || row.notes.size === 0) continue;
+        const notes = [...row.notes].sort((a, b) => a - b);
+        nextProgression[step] = {
+          notes,
+          duration: 1,
+          metadata: {
+            root: notes[0],
+            quality: "dom7",
+            velocities: [Math.max(1, Math.min(127, row.velocity))],
+            gate: [100],
+          },
+        };
+      }
+
+      updateCurrentSection({
+        ...section,
+        progression: section.modeProgressions?.harmony || section.progression,
+        modeProgressions: {
+          ...(section.modeProgressions || {}),
+          drum: nextProgression,
+        },
+      });
+      selectSlot(0);
+    },
+    [section, selectSlot, updateCurrentSection],
+  );
 
   const handleEvolveDrumPattern = useCallback(() => {
     const module = grooveModuleRef.current;
@@ -388,7 +412,13 @@ export function ProgressionEditor() {
     window.setTimeout(() => {
       setIsDrumPreviewing(false);
     }, timeoutMs);
-  }, [isDrumPreviewing, lastDrumTotalBeats, midiOutChannel, midiOutDeviceId, modeDefaultChannels]);
+  }, [
+    isDrumPreviewing,
+    lastDrumTotalBeats,
+    midiOutChannel,
+    midiOutDeviceId,
+    modeDefaultChannels,
+  ]);
 
   const handleDrumCustomAction = useCallback(
     (action: "capture" | "mutate" | "lock" | "reset") => {
@@ -517,13 +547,25 @@ export function ProgressionEditor() {
     if (quality.includes("Maj")) return "quality-maj"; // Orange
     if (quality.includes("min")) return "quality-min"; // Turquoise
     if (quality.includes("dom")) return "quality-dom"; // Yellow
-    
+
     // Outlier colors (special/rare chords)
     if (quality.includes("dim")) return "quality-dim"; // Purple
     if (quality.includes("aug")) return "quality-aug"; // Pink
     if (quality.includes("sus")) return "quality-sus"; // Red
-    if (quality.includes("add") || quality.includes("9") || quality.includes("11") || quality.includes("13")) return "quality-ext"; // Green
-    if (quality.includes("b5") || quality.includes("#5") || quality.includes("#9") || quality.includes("b9")) return "quality-alt"; // Blue
+    if (
+      quality.includes("add") ||
+      quality.includes("9") ||
+      quality.includes("11") ||
+      quality.includes("13")
+    )
+      return "quality-ext"; // Green
+    if (
+      quality.includes("b5") ||
+      quality.includes("#5") ||
+      quality.includes("#9") ||
+      quality.includes("b9")
+    )
+      return "quality-alt"; // Blue
 
     return "pad-default";
   }, []);
@@ -666,7 +708,12 @@ export function ProgressionEditor() {
   );
 
   const buildSection = useCallback(
-    (name: string, progressionData: Chord[], repeats = 1, beatsPerBar = 4): Section => ({
+    (
+      name: string,
+      progressionData: Chord[],
+      repeats = 1,
+      beatsPerBar = 4,
+    ): Section => ({
       id: crypto.randomUUID(),
       name,
       progression: progressionData,
@@ -689,18 +736,26 @@ export function ProgressionEditor() {
           makeChord(65, "Maj", 4),
           makeChord(67, "Maj", 4),
         ]);
-        const verse = buildSection("Verse", [
-          makeChord(60, "Maj", 4),
-          makeChord(69, "min", 4),
-          makeChord(65, "Maj", 4),
-          makeChord(67, "Maj", 4),
-        ], 2);
-        const chorus = buildSection("Chorus", [
-          makeChord(65, "Maj", 4),
-          makeChord(67, "Maj", 4),
-          makeChord(60, "Maj", 4),
-          makeChord(69, "min", 4),
-        ], 2);
+        const verse = buildSection(
+          "Verse",
+          [
+            makeChord(60, "Maj", 4),
+            makeChord(69, "min", 4),
+            makeChord(65, "Maj", 4),
+            makeChord(67, "Maj", 4),
+          ],
+          2,
+        );
+        const chorus = buildSection(
+          "Chorus",
+          [
+            makeChord(65, "Maj", 4),
+            makeChord(67, "Maj", 4),
+            makeChord(60, "Maj", 4),
+            makeChord(69, "min", 4),
+          ],
+          2,
+        );
         setSections([intro, verse, chorus], 0);
         return;
       }
@@ -718,12 +773,16 @@ export function ProgressionEditor() {
         makeChord(60, "dom7", 4),
         makeChord(60, "dom7", 4),
       ]);
-      const turnaround = buildSection("Turnaround (V-IV-I-V)", [
-        makeChord(67, "dom7", 4),
-        makeChord(65, "dom7", 4),
-        makeChord(60, "dom7", 4),
-        makeChord(67, "dom7", 4),
-      ], 2);
+      const turnaround = buildSection(
+        "Turnaround (V-IV-I-V)",
+        [
+          makeChord(67, "dom7", 4),
+          makeChord(65, "dom7", 4),
+          makeChord(60, "dom7", 4),
+          makeChord(67, "dom7", 4),
+        ],
+        2,
+      );
       setSections([bars1to4, bars5to8, turnaround], 0);
     },
     [buildSection, makeChord, setSections],
@@ -745,7 +804,9 @@ export function ProgressionEditor() {
           {/* Middle — Navigation menu (now also renders contextual drawer) */}
           <div className="flex-1 overflow-auto">
             <div className="card h-full p-2 relative">
-              <div className={`flip-container ${openDrawer ? "is-flipped" : ""}`}>
+              <div
+                className={`flip-container ${openDrawer ? "is-flipped" : ""}`}
+              >
                 <div className="flip-inner">
                   <div className="flip-front">
                     <LeftNavMenu />
@@ -754,42 +815,61 @@ export function ProgressionEditor() {
                   <div
                     className="flip-back"
                     role="dialog"
-                    aria-label={openDrawer ? `${openDrawer} panel` : "context panel"}
+                    aria-label={
+                      openDrawer ? `${openDrawer} panel` : "context panel"
+                    }
                     aria-hidden={!openDrawer}
                     tabIndex={-1}
                   >
                     <div className="p-2 h-full">
                       <FocusTrap active={!!openDrawer}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-sm font-semibold capitalize">{openDrawer}</div>
-                        <button
-                          className="btn-muted px-2 py-1"
-                          onClick={() => setOpenDrawer(null)}
-                        >
-                          Close
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 overflow-auto h-[calc(100%-3rem)]">
-                        {openDrawer === "sections" && <SongOverview />}
-                        {openDrawer === "settings" && <SongSettings />}
-                        {openDrawer === "sections-active" && <ActiveSectionEditor />}
-                        {openDrawer === "patterns" && (
-                          <div className="text-xs muted-text">Patterns panel (TODO)</div>
-                        )}
-                        {openDrawer === "library" && (
-                          <div className="text-xs muted-text">Library panel (TODO)</div>
-                        )}
-                        {openDrawer === "export" && (
-                          <div className="text-xs muted-text">Export options (TODO)</div>
-                        )}
-                        {openDrawer === "monitor" && <ConnectionMonitorPanel />}
-
-                        <div className="pt-2 border-t border-panel/20 mt-2">
-                          <ToolsPanel />
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm font-semibold capitalize">
+                            {openDrawer}
+                          </div>
+                          <button
+                            className="btn-muted px-2 py-1"
+                            onClick={() => setOpenDrawer(null)}
+                          >
+                            Close
+                          </button>
                         </div>
-                      </div>
-                    </FocusTrap>
+
+                        <div className="space-y-2 overflow-auto h-[calc(100%-3rem)]">
+                          {openDrawer === "sections" && <SongOverview />}
+                          {openDrawer === "settings" && (
+                            <div className="space-y-2">
+                              <SongSettings />
+                              <SongFormPicker />
+                            </div>
+                          )}
+                          {openDrawer === "sections-active" && (
+                            <ActiveSectionEditor />
+                          )}
+                          {openDrawer === "patterns" && (
+                            <div className="text-xs muted-text">
+                              Patterns panel (TODO)
+                            </div>
+                          )}
+                          {openDrawer === "library" && (
+                            <div className="text-xs muted-text">
+                              Library panel (TODO)
+                            </div>
+                          )}
+                          {openDrawer === "export" && (
+                            <div className="text-xs muted-text">
+                              Export options (TODO)
+                            </div>
+                          )}
+                          {openDrawer === "monitor" && (
+                            <ConnectionMonitorPanel />
+                          )}
+
+                          <div className="pt-2 border-t border-panel/20 mt-2">
+                            <ToolsPanel />
+                          </div>
+                        </div>
+                      </FocusTrap>
                     </div>
                   </div>
                 </div>
@@ -812,7 +892,9 @@ export function ProgressionEditor() {
                 {uiMode === "drum" ? (
                   <div className="harmony-controls-grid grid grid-cols-4 gap-x-3 gap-y-2">
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Complexity</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Complexity
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Drum complexity"
                         value={drumComplexity}
@@ -823,7 +905,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Change Rate</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Change Rate
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Drum change rate"
                         value={drumChangeRate}
@@ -834,7 +918,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Swing</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Swing
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Drum swing"
                         value={drumSwing}
@@ -845,7 +931,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Humanize</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Humanize
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Drum humanization"
                         value={drumHumanization}
@@ -856,7 +944,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Bars</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Bars
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Drum bars"
                         value={drumBars}
@@ -867,7 +957,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Kick Lvl</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Kick Lvl
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Kick level"
                         value={drumKickLevel}
@@ -878,7 +970,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Snare Lvl</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Snare Lvl
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Snare level"
                         value={drumSnareLevel}
@@ -889,7 +983,9 @@ export function ProgressionEditor() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] muted-text block mb-1">Hat/Perc Lvl</label>
+                      <label className="text-[10px] muted-text block mb-1">
+                        Hat/Perc Lvl
+                      </label>
                       <FloatingSliderPicker
                         ariaLabel="Hat and percussion level"
                         value={drumTopLevel}
@@ -907,13 +1003,17 @@ export function ProgressionEditor() {
                         {encoderState.degree === 0 ? "Root Note" : "Key"}
                       </label>
                       <FloatingSliderPicker
-                        ariaLabel={encoderState.degree === 0 ? "Root Note" : "Key"}
+                        ariaLabel={
+                          encoderState.degree === 0 ? "Root Note" : "Key"
+                        }
                         value={encoderState.keyRoot}
                         min={60}
                         max={71}
                         step={1}
                         onChange={(next) => updateEncoder("keyRoot", next)}
-                        formatValue={(midiNote) => NOTE_NAMES[(midiNote - 60 + 12) % 12]}
+                        formatValue={(midiNote) =>
+                          NOTE_NAMES[(midiNote - 60 + 12) % 12]
+                        }
                       />
                       <div className="text-[10px] muted-text text-center mt-0.5">
                         {NOTE_NAMES[(encoderState.keyRoot - 60 + 12) % 12]}
@@ -933,7 +1033,9 @@ export function ProgressionEditor() {
                         onChange={(next) =>
                           updateEncoder(
                             "mode",
-                            MODES[Math.max(0, Math.min(MODES.length - 1, next))],
+                            MODES[
+                              Math.max(0, Math.min(MODES.length - 1, next))
+                            ],
                           )
                         }
                         formatValue={(index) =>
@@ -968,7 +1070,9 @@ export function ProgressionEditor() {
                         }
                         disabled={encoderState.degree > 0}
                         formatValue={(index) =>
-                          QUALITIES[Math.max(0, Math.min(QUALITIES.length - 1, index))]
+                          QUALITIES[
+                            Math.max(0, Math.min(QUALITIES.length - 1, index))
+                          ]
                         }
                       />
                       <div className="text-[10px] muted-text text-center mt-0.5">
@@ -995,8 +1099,9 @@ export function ProgressionEditor() {
                           )
                         }
                         formatValue={(index) =>
-                          EXTENSIONS[Math.max(0, Math.min(EXTENSIONS.length - 1, index))]
-                            .label
+                          EXTENSIONS[
+                            Math.max(0, Math.min(EXTENSIONS.length - 1, index))
+                          ].label
                         }
                       />
                       <div className="text-[10px] muted-text text-center mt-0.5">
@@ -1017,17 +1122,20 @@ export function ProgressionEditor() {
                         onChange={(next) =>
                           updateEncoder(
                             "degree",
-                            DEGREES[Math.max(0, Math.min(DEGREES.length - 1, next))]
-                              .value,
+                            DEGREES[
+                              Math.max(0, Math.min(DEGREES.length - 1, next))
+                            ].value,
                           )
                         }
                         formatValue={(index) =>
-                          DEGREES[Math.max(0, Math.min(DEGREES.length - 1, index))]
-                            .label
+                          DEGREES[
+                            Math.max(0, Math.min(DEGREES.length - 1, index))
+                          ].label
                         }
                       />
                       <div className="text-[10px] muted-text text-center mt-0.5">
-                        {DEGREES.find((d) => d.value === encoderState.degree)?.label || "Root"}
+                        {DEGREES.find((d) => d.value === encoderState.degree)
+                          ?.label || "Root"}
                       </div>
                     </div>
 
@@ -1045,19 +1153,26 @@ export function ProgressionEditor() {
                           updateEncoder(
                             "drop",
                             DROP_VOICINGS[
-                              Math.max(0, Math.min(DROP_VOICINGS.length - 1, next))
+                              Math.max(
+                                0,
+                                Math.min(DROP_VOICINGS.length - 1, next),
+                              )
                             ].value,
                           )
                         }
                         formatValue={(index) =>
                           DROP_VOICINGS[
-                            Math.max(0, Math.min(DROP_VOICINGS.length - 1, index))
+                            Math.max(
+                              0,
+                              Math.min(DROP_VOICINGS.length - 1, index),
+                            )
                           ].label
                         }
                       />
                       <div className="text-[10px] muted-text text-center mt-0.5">
-                        {DROP_VOICINGS.find((v) => v.value === encoderState.drop)?.label ||
-                          "Close"}
+                        {DROP_VOICINGS.find(
+                          (v) => v.value === encoderState.drop,
+                        )?.label || "Close"}
                       </div>
                     </div>
 
@@ -1243,7 +1358,7 @@ export function ProgressionEditor() {
                         if (!chord) return;
                         e.preventDefault();
                         // TODO: Open velocity curve drawer
-                        console.log('Open velocity drawer for slot', i);
+                        console.log("Open velocity drawer for slot", i);
                       }}
                       className={`sequencer-cell matrix-pad relative w-full h-14 rounded transition-transform flex flex-col items-center justify-center text-xs font-bold compact gap-0.5 ${isEmpty ? "pad-empty sequencer-cell-off" : `matrix-pad-filled sequencer-cell-on ${getPadColor(chord.metadata?.quality)}`} ${isSelected ? "slot-selected matrix-pad-selected" : ""} hover:brightness-110 active:scale-95`}
                       title={`Slot ${i + 1}${chord ? `: ${NOTE_NAMES[(chord.metadata?.root || 0) % 12]}${chord.metadata?.quality}` : " (Empty)"}`}
@@ -1270,7 +1385,9 @@ export function ProgressionEditor() {
                   {uiMode === "harmony" ? "Duration" : "Step Length"}
                 </span>
                 {selectedSlot !== null && progression[selectedSlot] && (
-                  <span className="text-[9px] opacity-40 ml-1">• Slot {selectedSlot + 1}</span>
+                  <span className="text-[9px] opacity-40 ml-1">
+                    • Slot {selectedSlot + 1}
+                  </span>
                 )}
               </div>
               <div className="sequencer-lane sequencer-lane-duration grid gap-2 grid-cols-16">
@@ -1286,7 +1403,9 @@ export function ProgressionEditor() {
                   const isLit =
                     uiMode === "drum"
                       ? !!drumStepChord
-                      : !!(selectedChord && beatNumber <= selectedChord.duration);
+                      : !!(
+                          selectedChord && beatNumber <= selectedChord.duration
+                        );
 
                   return (
                     <button
@@ -1306,7 +1425,8 @@ export function ProgressionEditor() {
                           selectSlot(i);
                           return;
                         }
-                        if (selectedSlot === null || !progression[selectedSlot]) return;
+                        if (selectedSlot === null || !progression[selectedSlot])
+                          return;
                         const chord = progression[selectedSlot];
                         updateChord(selectedSlot, {
                           ...chord,
@@ -1324,7 +1444,10 @@ export function ProgressionEditor() {
                           });
                           return;
                         }
-                        if (selectedSlot !== null && progression[selectedSlot]) {
+                        if (
+                          selectedSlot !== null &&
+                          progression[selectedSlot]
+                        ) {
                           setBeatContextMenu({
                             x: e.clientX,
                             y: e.clientY,
@@ -1349,22 +1472,26 @@ export function ProgressionEditor() {
                           : `Click to set duration to ${beatNumber} beats • Right-click for gate/velocity`
                       }
                     >
-                      <span className="sequencer-step-index relative z-10">{beatNumber}</span>
+                      <span className="sequencer-step-index relative z-10">
+                        {beatNumber}
+                      </span>
                       {/* Velocity indicator badge */}
                       {selectedChord?.metadata?.velocities?.[
                         uiMode === "drum" ? 0 : beatNumber - 1
                       ] !== undefined &&
-                       selectedChord.metadata.velocities[
-                         uiMode === "drum" ? 0 : beatNumber - 1
-                       ] !== 100 && isLit && (
-                        <span className="absolute top-0.5 right-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
-                          V{
-                            selectedChord.metadata.velocities[
-                              uiMode === "drum" ? 0 : beatNumber - 1
-                            ]
-                          }
-                        </span>
-                      )}
+                        selectedChord.metadata.velocities[
+                          uiMode === "drum" ? 0 : beatNumber - 1
+                        ] !== 100 &&
+                        isLit && (
+                          <span className="absolute top-0.5 right-0.5 text-[7px] px-1 rounded bg-yellow text-black font-bold z-10">
+                            V
+                            {
+                              selectedChord.metadata.velocities[
+                                uiMode === "drum" ? 0 : beatNumber - 1
+                              ]
+                            }
+                          </span>
+                        )}
                     </button>
                   );
                 })}
@@ -1382,7 +1509,9 @@ export function ProgressionEditor() {
                   selectSlot(null);
                 }}
                 onSetCurrentSectionRepeats={(repeats: number) => {
-                  const active = useProgressionStore.getState().getCurrentSection();
+                  const active = useProgressionStore
+                    .getState()
+                    .getCurrentSection();
                   const updated = { ...active, repeats };
                   updateCurrentSection(updated);
                 }}
@@ -1424,52 +1553,69 @@ export function ProgressionEditor() {
         confirmText="Clear All"
         variant="danger"
       />
-      
+
       {/* Beat Pad Context Menu */}
-      {beatContextMenu && selectedSlot !== null && progression[selectedSlot] && (
-        <BeatPadContextMenu
-          x={beatContextMenu.x}
-          y={beatContextMenu.y}
-          beatNumber={beatContextMenu.beatNumber}
-          velocity={progression[selectedSlot].metadata?.velocities?.[beatContextMenu.beatNumber - 1] ?? 100}
-          gate={progression[selectedSlot].metadata?.gate?.[beatContextMenu.beatNumber - 1] ?? 150}
-          onUpdate={({ velocity, gate }) => {
-            const chord = progression[selectedSlot];
-            const bufferLength = Math.max(chord.duration, beatContextMenu.beatNumber);
-            const velocities =
-              chord.metadata?.velocities?.slice(0, bufferLength) ||
-              Array(bufferLength).fill(100);
-            const gateValues =
-              chord.metadata?.gate?.slice(0, bufferLength) ||
-              Array(bufferLength).fill(150);
-            while (velocities.length < bufferLength) velocities.push(100);
-            while (gateValues.length < bufferLength) gateValues.push(150);
-            velocities[beatContextMenu.beatNumber - 1] = velocity;
-            gateValues[beatContextMenu.beatNumber - 1] = gate;
-            updateChord(selectedSlot, {
-              ...chord,
-              metadata: {
-                ...chord.metadata,
-                velocities,
-                gate: gateValues,
-              },
-            });
-          }}
-          onClose={() => setBeatContextMenu(null)}
-        />
-      )}
-      
+      {beatContextMenu &&
+        selectedSlot !== null &&
+        progression[selectedSlot] && (
+          <BeatPadContextMenu
+            x={beatContextMenu.x}
+            y={beatContextMenu.y}
+            beatNumber={beatContextMenu.beatNumber}
+            velocity={
+              progression[selectedSlot].metadata?.velocities?.[
+                beatContextMenu.beatNumber - 1
+              ] ?? 100
+            }
+            gate={
+              progression[selectedSlot].metadata?.gate?.[
+                beatContextMenu.beatNumber - 1
+              ] ?? 150
+            }
+            onUpdate={({ velocity, gate }) => {
+              const chord = progression[selectedSlot];
+              const bufferLength = Math.max(
+                chord.duration,
+                beatContextMenu.beatNumber,
+              );
+              const velocities =
+                chord.metadata?.velocities?.slice(0, bufferLength) ||
+                Array(bufferLength).fill(100);
+              const gateValues =
+                chord.metadata?.gate?.slice(0, bufferLength) ||
+                Array(bufferLength).fill(150);
+              while (velocities.length < bufferLength) velocities.push(100);
+              while (gateValues.length < bufferLength) gateValues.push(150);
+              velocities[beatContextMenu.beatNumber - 1] = velocity;
+              gateValues[beatContextMenu.beatNumber - 1] = gate;
+              updateChord(selectedSlot, {
+                ...chord,
+                metadata: {
+                  ...chord.metadata,
+                  velocities,
+                  gate: gateValues,
+                },
+              });
+            }}
+            onClose={() => setBeatContextMenu(null)}
+          />
+        )}
+
       {/* Velocity Curve Drawer for Zone 3 chord cards */}
-      {velocityDrawer && velocityDrawer.isOpen && progression[velocityDrawer.slotIndex] && (
-        <VelocityCurveDrawer
-          isOpen={velocityDrawer.isOpen}
-          onClose={() => setVelocityDrawer(null)}
-          duration={progression[velocityDrawer.slotIndex].duration}
-          velocities={progression[velocityDrawer.slotIndex].metadata?.velocities || []}
-          onSave={handleVelocitySave}
-          chordName={`${NOTE_NAMES[(progression[velocityDrawer.slotIndex].metadata?.root || 0) % 12]}${progression[velocityDrawer.slotIndex].metadata?.quality}`}
-        />
-      )}
+      {velocityDrawer &&
+        velocityDrawer.isOpen &&
+        progression[velocityDrawer.slotIndex] && (
+          <VelocityCurveDrawer
+            isOpen={velocityDrawer.isOpen}
+            onClose={() => setVelocityDrawer(null)}
+            duration={progression[velocityDrawer.slotIndex].duration}
+            velocities={
+              progression[velocityDrawer.slotIndex].metadata?.velocities || []
+            }
+            onSave={handleVelocitySave}
+            chordName={`${NOTE_NAMES[(progression[velocityDrawer.slotIndex].metadata?.root || 0) % 12]}${progression[velocityDrawer.slotIndex].metadata?.quality}`}
+          />
+        )}
     </div>
   );
 }

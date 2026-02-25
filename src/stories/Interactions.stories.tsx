@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
-import { userEvent, within } from '@storybook/test';
+import { userEvent } from '@testing-library/user-event';
+import { screen } from '@testing-library/react';
 
 /**
  * Interactions Showcase
@@ -237,18 +238,17 @@ export const FormDefault: StoryObj = {
 
 export const FormFilled: StoryObj = {
   render: () => <InteractiveForm />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const nameInput = canvas.getByTestId('name-input');
-    const emailInput = canvas.getByTestId('email-input');
-    const submitBtn = canvas.getByTestId('submit-btn');
+  play: async () => {
+    const nameInput = screen.getByTestId('name-input');
+    const emailInput = screen.getByTestId('email-input');
+    const submitBtn = screen.getByTestId('submit-btn');
 
     // Type in form fields
-    await userEvent.type(nameInput, 'John Doe', { delay: 50 });
-    await userEvent.type(emailInput, 'john@example.com', { delay: 50 });
+    await userEvent().type(nameInput, 'John Doe', { delay: 50 });
+    await userEvent().type(emailInput, 'john@example.com', { delay: 50 });
 
     // Submit form
-    await userEvent.click(submitBtn);
+    await userEvent().click(submitBtn);
   },
 };
 
@@ -259,13 +259,12 @@ export const CounterDefault: StoryObj = {
 
 export const CounterIncremented: StoryObj = {
   render: () => <InteractiveCounter />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const incrementBtn = canvas.getByTestId('increment-btn');
+  play: async () => {
+    const incrementBtn = screen.getByTestId('increment-btn');
 
     // Click increment button 5 times
     for (let i = 0; i < 5; i++) {
-      await userEvent.click(incrementBtn);
+      await userEvent().click(incrementBtn);
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
   },
@@ -273,19 +272,18 @@ export const CounterIncremented: StoryObj = {
 
 export const CounterDecremented: StoryObj = {
   render: () => <InteractiveCounter />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const incrementBtn = canvas.getByTestId('increment-btn');
-    const decrementBtn = canvas.getByTestId('decrement-btn');
+  play: async () => {
+    const incrementBtn = screen.getByTestId('increment-btn');
+    const decrementBtn = screen.getByTestId('decrement-btn');
 
     // Increment to 5
     for (let i = 0; i < 5; i++) {
-      await userEvent.click(incrementBtn);
+      await userEvent().click(incrementBtn);
     }
 
     // Then decrement to 2
     for (let i = 0; i < 3; i++) {
-      await userEvent.click(decrementBtn);
+      await userEvent().click(decrementBtn);
     }
   },
 };

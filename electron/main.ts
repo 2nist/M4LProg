@@ -49,14 +49,13 @@ let oscStatus: OSCConnectionStatus = "idle";
 function getOSCHealth() {
   const now = Date.now();
   const stale = oscLastMessageAt > 0 && now - oscLastMessageAt > OSC_STALE_MS;
-  const status: OSCConnectionStatus =
-    isOSCConnecting
-      ? "connecting"
-      : isOSCConnected
-        ? stale
-          ? "degraded"
-          : "connected"
-        : oscStatus;
+  const status: OSCConnectionStatus = isOSCConnecting
+    ? "connecting"
+    : isOSCConnected
+      ? stale
+        ? "degraded"
+        : "connected"
+      : oscStatus;
 
   return {
     status,
@@ -235,6 +234,169 @@ function closeOSC(): void {
 // End OSC Service
 // ============================================================================
 
+// ============================================================================
+// REAPER OSC Service - Separate from Live OSC
+// ============================================================================
+const DEFAULT_REAPER_SEND_PORT = 11002; // Electron → REAPER
+const DEFAULT_REAPER_RECEIVE_PORT = 11003; // REAPER → Electron
+
+let reaperUdpPort: any = null;
+let isREAPEROSCConnected = false;
+let isREAPEROSCConnecting = false;
+let isREAPEROSCClosing = false;
+let reaperSendPort = DEFAULT_REAPER_SEND_PORT;
+let reaperReceivePort = DEFAULT_REAPER_RECEIVE_PORT;
+let reaperLastMessageAt = 0;
+let reaperLastError: string | null = null;
+let reaperRetryCount = 0;
+let reaperRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getREAPEROSCHealth() {
+  const now = Date.now();
+  const stale =
+    reaperLastMessageAt > 0 && now - reaperLastMessageAt > OSC_STALE_MS;
+  const status: OSCConnectionStatus = isREAPEROSCConnecting
+    ? "connecting"
+    : isREAPEROSCConnected
+      ? stale
+        ? "degraded"
+        : "connected"
+      : "idle";
+
+  return {
+    status,
+    isConnected: isREAPEROSCConnected,
+    isStale: stale,
+    sendPort: reaperSendPort,
+    receivePort: reaperReceivePort,
+    retryCount: reaperRetryCount,
+    nextRetryMs: OSC_RETRY_BASE_MS,
+    lastMessageAt: reaperLastMessageAt,
+    lastError: reaperLastError,
+  };
+}
+
+function initializeREAPEROSC(
+  sendPort: number = DEFAULT_REAPER_SEND_PORT,
+  receivePort: number = DEFAULT_REAPER_RECEIVE_PORT,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (isREAPEROSCConnecting) {
+      resolve(false);
+      return;
+    }
+    isREAPEROSCConnecting = true;
+    isREAPEROSCClosing = false;
+    reaperSendPort = sendPort;
+    reaperReceivePort = receivePort;
+    reaperLastError = null;
+
+    if (reaperUdpPort) {
+      try {
+        reaperUdpPort.close();
+      } catch {
+        // Best effort
+      }
+      reaperUdpPort = null;
+      isREAPEROSCConnected = false;
+    }
+
+    try {
+      reaperUdpPort = new osc.UDPPort({
+        localAddress: "127.0.0.1",
+        localPort: receivePort,
+        remoteAddress: "127.0.0.1",
+        remotePort: sendPort,
+        metadata: true,
+      });
+
+      reaperUdpPort.on("ready", () => {
+        console.log("[REAPER OSC] Server ready on port", receivePort);
+        isREAPEROSCConnected = true;
+        isREAPEROSCConnecting = false;
+        reaperRetryCount = 0;
+        reaperLastMessageAt = Date.now();
+
+        // Send handshake
+        sendREAPEROSCMessage("/hello", ["ChordGenPro", "1.0.0"]);
+
+        resolve(true);
+      });
+
+      reaperUdpPort.on("message", (oscMsg: any) => {
+        console.log("[REAPER OSC] Received:", oscMsg.address, oscMsg.args);
+        reaperLastMessageAt = Date.now();
+
+        // Forward message to renderer process
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send(
+            "reaper:message",
+            oscMsg.address,
+            oscMsg.args,
+          );
+        }
+      });
+
+      reaperUdpPort.on("error", (error: any) => {
+        console.error("[REAPER OSC] Error:", error);
+        isREAPEROSCConnected = false;
+        isREAPEROSCConnecting = false;
+        reaperRetryCount += 1;
+        reaperLastError =
+          error instanceof Error ? error.message : String(error);
+        resolve(false);
+      });
+
+      reaperUdpPort.open();
+    } catch (error) {
+      console.error("[REAPER OSC] Failed to initialize:", error);
+      isREAPEROSCConnecting = false;
+      isREAPEROSCConnected = false;
+      reaperRetryCount += 1;
+      reaperLastError = error instanceof Error ? error.message : String(error);
+      resolve(false);
+    }
+  });
+}
+
+function sendREAPEROSCMessage(address: string, args: any): void {
+  if (!reaperUdpPort || !isREAPEROSCConnected) {
+    console.warn("[REAPER OSC] Not connected");
+    return;
+  }
+
+  const oscMsg: any = {
+    address,
+    args: Array.isArray(args) ? args : [args],
+  };
+
+  try {
+    reaperUdpPort.send(oscMsg);
+    console.log("[REAPER OSC] Sent:", address, args);
+  } catch (error) {
+    console.error("[REAPER OSC] Send failed:", error);
+  }
+}
+
+function closeREAPEROSC(): void {
+  isREAPEROSCClosing = true;
+  if (reaperRetryTimer) {
+    clearTimeout(reaperRetryTimer);
+    reaperRetryTimer = null;
+  }
+  if (reaperUdpPort) {
+    reaperUdpPort.close();
+    reaperUdpPort = null;
+  }
+  isREAPEROSCConnected = false;
+  isREAPEROSCConnecting = false;
+  console.log("[REAPER OSC] Connection closed");
+}
+
+// ============================================================================
+// End REAPER OSC Service
+// ============================================================================
+
 const createWindow = () => {
   // Set up Content Security Policy for Electron
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -371,6 +533,43 @@ function setupIPCHandlers(): void {
   // OSC: Close connection
   ipcMain.handle("osc:close", async () => {
     closeOSC();
+  });
+
+  // REAPER OSC: Send message
+  ipcMain.handle(
+    "reaper:send",
+    async (_event, address: string, args: any[]) => {
+      sendREAPEROSCMessage(address, args);
+    },
+  );
+
+  // REAPER OSC: Check connection status
+  ipcMain.handle("reaper:isConnected", async () => {
+    return isREAPEROSCConnected;
+  });
+
+  // REAPER OSC: Get health/status
+  ipcMain.handle("reaper:getHealth", async () => {
+    return getREAPEROSCHealth();
+  });
+
+  // REAPER OSC: Initialize/reconnect
+  ipcMain.handle(
+    "reaper:initialize",
+    async (_event, sendPort?: number, receivePort?: number) => {
+      return await initializeREAPEROSC(sendPort, receivePort);
+    },
+  );
+
+  // REAPER OSC: Force reconnect
+  ipcMain.handle("reaper:reconnect", async () => {
+    closeREAPEROSC();
+    return await initializeREAPEROSC(reaperSendPort, reaperReceivePort);
+  });
+
+  // REAPER OSC: Close connection
+  ipcMain.handle("reaper:close", async () => {
+    closeREAPEROSC();
   });
 
   // MIDI (reserved): explicit no-op handlers to avoid renderer IPC failures.

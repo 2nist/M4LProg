@@ -1,4 +1,4 @@
-ave in case we==================**
+/**
  * REAPER OSC Service for REAPER DAW Communication (Renderer Process)
  * Communicates with main process via IPC for OSC messaging to REAPER
  *
@@ -8,8 +8,6 @@ ave in case we==================**
 import {
   REAPER_OSC_ADDRESSES,
   REAPERNote,
-  type REAPERTransportState,
-  type REAPERTrack,
   getTrackAddress,
 } from "../../types/osc-reaper";
 
@@ -364,7 +362,7 @@ export function createProgression(
 ): void {
   const velocity = options?.velocity ?? 100;
   const channel = options?.channel ?? 0;
-  const tempo = options?.Tempo ?? 120;
+  const tempo = options?.tempo ?? 120;
 
   // Convert progression to REAPER notes
   const reaperNotes: REAPERNote[] = [];

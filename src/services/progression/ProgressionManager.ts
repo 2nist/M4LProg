@@ -1,4 +1,5 @@
 /**
+ * r
  * Progression Manager
  * Manages song sections, progressions, pattern detection, and pattern library
  *
@@ -16,8 +17,15 @@ import type {
   DetectedPattern,
   ApplyPatternOptions,
 } from "../../types/pattern";
-import type { Section, ProgressionSnapshot } from "../../types/progression";
+import {
+  type Section,
+  type ProgressionSnapshot,
+  type SongFormTemplate,
+  type SectionType,
+  SONG_FORM_TEMPLATES,
+} from "../../types/progression";
 import type { Chord, Progression, ChordQuality } from "../../types/chord";
+import type { ArrangementBlock, ModeId } from "../../types/arrangement";
 import * as MusicTheory from "@services/musicTheory/MusicTheoryEngine";
 
 // ============================================================================
@@ -541,4 +549,152 @@ export function validateProgression(progression: Progression): string[] {
   }
 
   return warnings;
+}
+
+// ============================================================================
+// Song Form Templates (from lalo-chezia integration)
+// ============================================================================
+
+/**
+ * Get all available song form templates
+ * @returns Array of song form templates
+ */
+export function getSongFormTemplates(): SongFormTemplate[] {
+  return SONG_FORM_TEMPLATES;
+}
+
+/**
+ * Create a section from a template definition
+ * @param templateSection - Template section definition
+ * @param key - Musical key root (MIDI note)
+ * @param patternId - Optional pattern ID to apply
+ * @returns New section with progression
+ */
+export function createSectionFromTemplate(
+  templateSection: { name: string; type: SectionType; defaultRepeats?: number },
+  key: number = 60,
+  patternId?: string,
+): Section {
+  let progression: Progression = [];
+
+  // If a pattern is specified, apply it
+  if (patternId) {
+    const patternProgression = applyPattern(patternId, { root: key });
+    if (patternProgression) {
+      progression = patternProgression;
+    }
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    name: templateSection.name,
+    sectionType: templateSection.type,
+    progression,
+    modeProgressions: {
+      harmony: progression,
+      drum: [],
+      other: [],
+    },
+    repeats: templateSection.defaultRepeats || 1,
+    beatsPerBar: 4,
+    rootHeld: null,
+    currentNotes: [],
+    transitions: { type: "none", length: 2 },
+  };
+}
+
+/**
+ * Create sections and arrangement blocks from a song form template
+ * @param templateId - Template ID (e.g., "abab", "12bar-blues")
+ * @param options - Options for creation
+ * @returns Object with created sections and arrangement blocks
+ */
+export function createArrangementFromTemplate(
+  templateId: string,
+  options: {
+    key?: number;
+    patternId?: string;
+    startBeat?: number;
+  } = {},
+): {
+  sections: Section[];
+  blocks: ArrangementBlock[];
+} {
+  const templates = getSongFormTemplates();
+  const template = templates.find((t) => t.id === templateId);
+
+  if (!template) {
+    console.warn(`Song form template "${templateId}" not found`);
+    return { sections: [], blocks: [] };
+  }
+
+  const key = options.key ?? 60;
+  const startBeat = options.startBeat ?? 0;
+  const sections: Section[] = [];
+  const blocks: ArrangementBlock[] = [];
+
+  // Track which sections we've created (to reuse for repeated letters)
+  const sectionCache = new Map<string, Section>();
+  let currentBeat = startBeat;
+
+  for (const sectionKey of template.structure) {
+    const templateSection = template.sections[sectionKey];
+
+    if (!templateSection) {
+      console.warn(`Section "${sectionKey}" not found in template`);
+      continue;
+    }
+
+    let section: Section;
+
+    // Reuse section if we've already created one with this key (e.g., AABA form)
+    if (sectionCache.has(sectionKey)) {
+      section = cloneSection(sectionCache.get(sectionKey)!);
+      section.id = crypto.randomUUID(); // New ID for the new instance
+    } else {
+      section = createSectionFromTemplate(
+        templateSection,
+        key,
+        options.patternId,
+      );
+      sectionCache.set(sectionKey, cloneSection(section));
+    }
+
+    // Calculate section duration
+    const sectionDuration = section.progression.reduce(
+      (sum, chord) => sum + (chord.duration || 4),
+      0,
+    );
+    const blockDuration = sectionDuration * (section.repeats || 1);
+
+    // Create arrangement block
+    const block: ArrangementBlock = {
+      id: crypto.randomUUID(),
+      sourceId: section.id,
+      mode: "harmony" as ModeId,
+      startBeat: currentBeat,
+      lengthBeats: blockDuration,
+      label: section.name,
+      repeats: section.repeats,
+    };
+
+    sections.push(section);
+    blocks.push(block);
+
+    currentBeat += blockDuration;
+  }
+
+  return { sections, blocks };
+}
+
+/**
+ * Get a template by ID
+ * @param templateId - Template ID to find
+ * @returns Template if found
+ */
+export function getSongFormTemplate(
+  templateId: string,
+): SongFormTemplate | undefined {
+  const templates = getSongFormTemplates();
+  return templates.find((t) => t.id === templateId);
 }

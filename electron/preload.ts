@@ -1,14 +1,15 @@
-impor { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 /**
- * Preload script - exposes safe IPC methods to renderer
+ * =============================================================================
+ * PRELOAD SCRIPT - Exposes safe IPC methods to renderer
  * This runs in a context that has access to both Node.js and the DOM
+ * =============================================================================
  */
 
-// Expose protected methods that allow the renderer process to use
-// ipcRenderer without exposing the entire object
+// ======================= OSC Communication (Ableton Live) =======================
+
 contextBridge.exposeInMainWorld("electronAPI", {
-  // OSC communication
   sendOSC: (address: string, args: any[]) => {
     return ipcRenderer.invoke("osc:send", address, args);
   },
@@ -36,7 +37,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("osc:message", handler);
   },
 
-  // REAPER OSC communication
+  // ======================= REAPER OSC Communication =======================
+
   sendREAPEROSC: (address: string, args: any[]) => {
     return ipcRenderer.invoke("reaper:send", address, args);
   },
@@ -64,7 +66,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("reaper:message", handler);
   },
 
-  // MIDI communication (reserved)
+  // ======================= MIDI Communication (Reserved) =======================
+
   getMIDIDevices: () => {
     return ipcRenderer.invoke("midi:getDevices");
   },
@@ -77,7 +80,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("midi:message", (_event, message) => callback(message));
   },
 
-  // File operations
+  // ======================= File Operations =======================
+
   saveFile: (filename: string, data: any) => {
     return ipcRenderer.invoke("file:save", filename, data);
   },
@@ -116,6 +120,32 @@ declare global {
         lastError: string | null;
       }>;
       onOSCMessage: (callback: (message: any) => void) => () => void;
+      // REAPER OSC
+      sendREAPEROSC: (address: string, args: any[]) => Promise<void>;
+      initializeREAPEROSC: (
+        sendPort?: number,
+        receivePort?: number,
+      ) => Promise<boolean>;
+      reconnectREAPEROSC: () => Promise<boolean>;
+      closeREAPEROSC: () => Promise<void>;
+      getREAPEROSCHealth: () => Promise<{
+        status:
+          | "idle"
+          | "connecting"
+          | "connected"
+          | "degraded"
+          | "retrying"
+          | "error";
+        isConnected: boolean;
+        isStale: boolean;
+        sendPort: number;
+        receivePort: number;
+        retryCount: number;
+        nextRetryMs: number;
+        lastMessageAt: number;
+        lastError: string | null;
+      }>;
+      onREAPEROSCMessage: (callback: (message: any) => void) => () => void;
       getMIDIDevices: () => Promise<any[]>;
       sendMIDI: (deviceId: string, message: number[]) => Promise<boolean>;
       onMIDIMessage: (callback: (message: number[]) => void) => void;

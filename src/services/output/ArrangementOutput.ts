@@ -197,18 +197,18 @@ function parseTimeSignature(sig: string): {
   return { numerator, denominatorPow: Math.max(0, denominatorPow) };
 }
 
-export function toMidiFileBytes(
+/**
+ * Convert events to MIDI timeline sorted by tick
+ */
+function eventsToTimeline(
   events: ArrangedChordEvent[],
-  options?: { tempo?: number; timeSignature?: string; ppq?: number },
-): Uint8Array {
-  const tempo = options?.tempo || DEFAULT_TEMPO;
-  const ppq = options?.ppq || 480;
-  const beatsPerSecond = tempo / 60;
-  const usPerQuarter = Math.max(1, Math.round(1_000_000 / beatsPerSecond));
-  const { numerator, denominatorPow } = parseTimeSignature(
-    options?.timeSignature || "4/4",
-  );
-
+  ppq: number,
+): Array<{
+  tick: number;
+  status: number;
+  data1: number;
+  data2: number;
+}> {
   const timeline: Array<{
     tick: number;
     status: number;
@@ -241,10 +241,29 @@ export function toMidiFileBytes(
     });
   }
 
-  timeline.sort((a, b) => {
+  return timeline.sort((a, b) => {
     if (a.tick !== b.tick) return a.tick - b.tick;
     return a.status - b.status;
   });
+}
+
+/**
+ * Create track data with tempo and time signature meta events
+ */
+function createTrackData(
+  timeline: Array<{
+    tick: number;
+    status: number;
+    data1: number;
+    data2: number;
+  }>,
+  tempo: number,
+  timeSignature: string,
+): number[] {
+  const ppq = 480;
+  const beatsPerSecond = tempo / 60;
+  const usPerQuarter = Math.max(1, Math.round(1_000_000 / beatsPerSecond));
+  const { numerator, denominatorPow } = parseTimeSignature(timeSignature);
 
   const trackData: number[] = [];
   const pushMeta = (delta: number, metaType: number, data: number[]) => {
@@ -277,6 +296,37 @@ export function toMidiFileBytes(
   }
 
   trackData.push(0x00, 0xff, 0x2f, 0x00);
+  return trackData;
+}
+
+/**
+ * Create a track with only text meta events (for track names)
+ */
+function createMetaTrackData(trackName: string): number[] {
+  const trackData: number[] = [];
+  const nameBytes = new TextEncoder().encode(trackName);
+
+  // Track name meta event
+  trackData.push(0x00, 0xff, 0x03);
+  trackData.push(...encodeVarLen(nameBytes.length));
+  trackData.push(...nameBytes);
+
+  // End of track
+  trackData.push(0x00, 0xff, 0x2f, 0x00);
+
+  return trackData;
+}
+
+export function toMidiFileBytes(
+  events: ArrangedChordEvent[],
+  options?: { tempo?: number; timeSignature?: string; ppq?: number },
+): Uint8Array {
+  const tempo = options?.tempo || DEFAULT_TEMPO;
+  const ppq = options?.ppq || 480;
+  const timeSignature = options?.timeSignature || "4/4";
+
+  const timeline = eventsToTimeline(events, ppq);
+  const trackData = createTrackData(timeline, tempo, timeSignature);
 
   const bytes: number[] = [];
   bytes.push(0x4d, 0x54, 0x68, 0x64); // MThd
@@ -290,6 +340,210 @@ export function toMidiFileBytes(
   bytes.push(...trackData);
 
   return new Uint8Array(bytes);
+}
+
+/**
+ * Multi-track MIDI export options
+ */
+export interface MultiTrackMidiOptions {
+  tempo?: number;
+  timeSignature?: string;
+  ppq?: number;
+  /** Channel mapping for each mode. Defaults to 1 for harmony, 10 for drum, 11 for other */
+  modeChannels?: Partial<Record<ModeId, number>>;
+  /** Include track for each mode. Defaults to all true */
+  includeModes?: Partial<Record<ModeId, boolean>>;
+}
+
+/**
+ * Export arrangement to Type 1 MIDI file with separate tracks per mode
+ * This creates a multi-track MIDI file ideal for DAW import
+ *
+ * @param sections - Sections with progressions
+ * @param blocks - Arrangement blocks
+ * @param options - Export options
+ * @returns Type 1 MIDI file bytes with separate tracks per mode
+ */
+export function toMultiTrackMidiFileBytes(
+  sections: Section[],
+  blocks: ArrangementBlock[],
+  options: MultiTrackMidiOptions = {},
+): Uint8Array {
+  const tempo = options.tempo || DEFAULT_TEMPO;
+  const ppq = options.ppq || 480;
+  const timeSignature = options.timeSignature || "4/4";
+
+  // Default channel assignments
+  const defaultChannels: Record<ModeId, number> = {
+    harmony: 1,
+    drum: 10,
+    other: 11,
+  };
+  const modeChannels = {
+    ...defaultChannels,
+    ...options.modeChannels,
+  };
+
+  // Which modes to include
+  const defaultInclude: Record<ModeId, boolean> = {
+    harmony: true,
+    drum: true,
+    other: true,
+  };
+  const includeModes = {
+    ...defaultInclude,
+    ...options.includeModes,
+  };
+
+  // Build events for all modes
+  const allEvents = buildArrangedChordEvents(sections, blocks);
+
+  // Group events by mode
+  const eventsByMode: Record<ModeId, ArrangedChordEvent[]> = {
+    harmony: [],
+    drum: [],
+    other: [],
+  };
+
+  for (const event of allEvents) {
+    const mode = event.mode as ModeId;
+    if (eventsByMode[mode]) {
+      eventsByMode[mode].push(event);
+    }
+  }
+
+  // Build track data for each included mode
+  const trackDataList: number[][] = [];
+
+  // Add meta track first (optional - for track names)
+  const trackNames: ModeId[] = ["harmony", "drum", "other"].filter(
+    (m) => includeModes[m as ModeId],
+  ) as ModeId[];
+
+  // Determine total tracks: 1 for header + 1 per mode
+  const trackCount = 1 + trackNames.length;
+
+  const bytes: number[] = [];
+  bytes.push(0x4d, 0x54, 0x68, 0x64); // MThd
+  pushU32(bytes, 6);
+  bytes.push(0x00, 0x00); // format 1 (multi-track)
+  bytes.push((trackCount >> 8) & 0xff, trackCount & 0xff);
+  bytes.push((ppq >> 8) & 0xff, ppq & 0xff);
+
+  // Create tracks for each mode
+  for (const mode of trackNames) {
+    const events = eventsByMode[mode];
+    const channel = modeChannels[mode];
+    const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+
+    // Apply channel to events
+    const channeledEvents = events.map((e) => ({
+      ...e,
+      midiChannel: channel,
+    }));
+
+    const timeline = eventsToTimeline(channeledEvents, ppq);
+    const trackData = createTrackData(timeline, tempo, timeSignature);
+
+    bytes.push(0x4d, 0x54, 0x72, 0x6b); // MTrk
+    pushU32(bytes, trackData.length);
+    bytes.push(...trackData);
+  }
+
+  return new Uint8Array(bytes);
+}
+
+/**
+ * Detect song form from section names
+ * Returns letters (A, B, C...) based on unique sections
+ */
+export function detectSongForm(sections: Section[]): string {
+  if (!sections || sections.length === 0) return "";
+
+  // Map section names to form letters
+  const uniqueSections: Map<string, string> = new Map();
+  let letterCode = 65; // ASCII 'A'
+
+  const formLetters: string[] = [];
+
+  for (const section of sections) {
+    const name = section.name || "Section";
+
+    if (!uniqueSections.has(name)) {
+      uniqueSections.set(name, String.fromCharCode(letterCode));
+      letterCode += 1;
+    }
+
+    formLetters.push(uniqueSections.get(name)!);
+  }
+
+  return formLetters.join("-");
+}
+
+/**
+ * Get form analysis with detailed breakdown
+ */
+export interface SongFormAnalysis {
+  form: string;
+  sections: Array<{
+    name: string;
+    letter: string;
+    type: string;
+    repeats: number;
+    durationBeats: number;
+  }>;
+  totalDuration: number;
+}
+
+export function analyzeSongForm(
+  sections: Section[],
+  blocks: ArrangementBlock[],
+): SongFormAnalysis {
+  const uniqueSections: Map<string, string> = new Map();
+  let letterCode = 65;
+
+  const sectionMap = new Map(sections.map((s) => [s.id, s]));
+
+  const analyzed: SongFormAnalysis["sections"] = [];
+
+  for (const block of blocks) {
+    const section = sectionMap.get(block.sourceId);
+    if (!section) continue;
+
+    const name = section.name || "Section";
+
+    if (!uniqueSections.has(name)) {
+      uniqueSections.set(name, String.fromCharCode(letterCode));
+      letterCode += 1;
+    }
+
+    const letter = uniqueSections.get(name)!;
+    const repeats = block.repeats || section.repeats || 1;
+
+    // Calculate duration
+    const progression = section.progression || [];
+    const sectionDuration = progression.reduce(
+      (sum, chord) => sum + safeDuration(chord.duration),
+      0,
+    );
+    const blockDuration = sectionDuration * repeats;
+
+    analyzed.push({
+      name,
+      letter,
+      type: section.sectionType || "custom",
+      repeats,
+      durationBeats: blockDuration,
+    });
+  }
+
+  const totalDuration = analyzed.reduce((sum, s) => sum + s.durationBeats, 0);
+
+  return {
+    form: analyzed.map((s) => s.letter).join("-"),
+    sections: analyzed,
+    totalDuration,
+  };
 }
 
 export function triggerBrowserDownload(
