@@ -12,7 +12,10 @@ const config: StorybookConfig = {
     "@storybook/addon-docs",
     "@storybook/addon-viewport",
     "@storybook/addon-backgrounds",
-    "@storybook/addon-interactions"
+    "@storybook/addon-interactions",
+    "@storybook/addon-storysource",
+    "@storybook/addon-pseudo-states",
+    "@storybook/addon-measure"
   ],
   "framework": "@storybook/react-vite"
 };
