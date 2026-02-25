@@ -6,6 +6,10 @@ import { useRoutingStore } from "@stores/routingStore";
 
 export default function ConnectionMonitorPanel() {
   const isOscConnected = useLiveStore((s) => s.isConnected);
+  const oscStatus = useLiveStore((s) => s.connectionStatus);
+  const oscIsStale = useLiveStore((s) => s.isConnectionStale);
+  const oscRetryCount = useLiveStore((s) => s.retryCount);
+  const oscLastError = useLiveStore((s) => s.lastError);
   const isMidiConnected = useHardwareStore((s) => s.isConnected);
   const connectionEvents = useRoutingStore((s) => s.connectionEvents);
   const showHeaderConnectionCards = useRoutingStore((s) => s.showHeaderConnectionCards);
@@ -45,11 +49,15 @@ export default function ConnectionMonitorPanel() {
 
       <div className="grid grid-cols-2 gap-2 text-[10px]">
         <div className="rounded border border-border px-2 py-1">
-          OSC: {isOscConnected ? "connected" : "disconnected"}
+          OSC: {isOscConnected ? "connected" : "disconnected"} ({oscStatus}
+          {oscIsStale ? ", stale" : ""})
         </div>
         <div className="rounded border border-border px-2 py-1">
           MIDI: {isMidiConnected ? "connected" : "disconnected"}
         </div>
+      </div>
+      <div className="text-[10px] muted-text">
+        OSC retry count: {oscRetryCount}. Last error: {oscLastError || "none"}.
       </div>
 
       <div className="flex items-center justify-between">

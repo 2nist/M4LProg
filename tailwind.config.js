@@ -47,5 +47,11 @@ export default {
       },
     },
   },
+  safelist: [
+    { pattern: /^bg-(gray|green|blue|red|yellow|purple)-(300|400|500|600|700|800|900)(\\/\d{1,3})?$/ },
+    'btn',
+    'btn-small',
+    'btn-ghost-small'
+  ],
   plugins: [],
 };

@@ -25,21 +25,23 @@ describe('OSC Service Integration', () => {
     // Clean up any handlers
     (window as any).electronAPI.onOSCMessage.mockClear();
     (window as any).electronAPI.sendOSC.mockClear();
+    (window as any).electronAPI.initializeOSC.mockClear();
+    (window as any).electronAPI.closeOSC.mockClear();
   });
 
   describe('OSC Service Functions', () => {
     it('should initialize OSC connection successfully', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const result = await OSCService.initializeOSC();
 
       expect(result).toBe(true);
       expect((window as any).electronAPI.onOSCMessage).toHaveBeenCalled();
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith('/chordgen/initialize', []);
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(OSC_ADDRESSES.HANDSHAKE, {
-        version: '1.0.0',
-        clientId: 'chordgen-pro',
-      });
+      expect((window as any).electronAPI.initializeOSC).toHaveBeenCalledWith(11000, 11001);
+      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(
+        OSC_ADDRESSES.HANDSHAKE,
+        ['1.0.0', 'chordgen-pro'],
+      );
     });
 
     it('should not reinitialize if already initialized', async () => {
@@ -52,7 +54,7 @@ describe('OSC Service Integration', () => {
     });
 
     it('should handle initialization failure', async () => {
-      (window as any).electronAPI.sendOSC.mockRejectedValue(new Error('Connection failed'));
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(false);
 
       const result = await OSCService.initializeOSC();
 
@@ -110,18 +112,10 @@ describe('OSC Service Integration', () => {
 
       OSCService.createProgression(progression, 1, 8);
 
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(OSC_ADDRESSES.CREATE_PROGRESSION, {
-        trackIndex: 1,
-        startBeat: 8,
-        notes: [
-          { pitch: 60, startTime: 0, duration: 4, velocity: 100 },
-          { pitch: 64, startTime: 0, duration: 4, velocity: 100 },
-          { pitch: 67, startTime: 0, duration: 4, velocity: 100 },
-          { pitch: 62, startTime: 4, duration: 4, velocity: 100 },
-          { pitch: 65, startTime: 4, duration: 4, velocity: 100 },
-          { pitch: 69, startTime: 4, duration: 4, velocity: 100 },
-        ],
-      });
+      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(
+        OSC_ADDRESSES.CREATE_PROGRESSION,
+        [1, 8, 60, 0, 4, 100, 64, 0, 4, 100, 67, 0, 4, 100, 62, 4, 4, 100, 65, 4, 4, 100, 69, 4, 4, 100],
+      );
     });
 
     it('should play chord immediately', () => {
@@ -167,7 +161,7 @@ describe('OSC Service Integration', () => {
 
       OSCService.closeOSC();
 
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith('/chordgen/close', []);
+      expect((window as any).electronAPI.closeOSC).toHaveBeenCalled();
       expect(OSCService.isOSCConnected()).toBe(false);
     });
 
@@ -179,7 +173,7 @@ describe('OSC Service Integration', () => {
 
   describe('Live Store Integration', () => {
     it('should initialize OSC and set up message handlers', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC } = useLiveStore.getState();
 
@@ -192,7 +186,7 @@ describe('OSC Service Integration', () => {
     });
 
     it('should update transport state from OSC messages', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC } = useLiveStore.getState();
       await initializeOSC();
@@ -211,7 +205,7 @@ describe('OSC Service Integration', () => {
     });
 
     it('should update track information from OSC messages', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC } = useLiveStore.getState();
       await initializeOSC();
@@ -237,7 +231,7 @@ describe('OSC Service Integration', () => {
     });
 
     it('should handle transport controls', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC, play, pause, stop, jumpByBars, jumpToBeat } = useLiveStore.getState();
 
@@ -289,7 +283,7 @@ describe('OSC Service Integration', () => {
     });
 
     it('should create progression', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC, createProgression } = useLiveStore.getState();
       await initializeOSC();
@@ -300,19 +294,14 @@ describe('OSC Service Integration', () => {
 
       createProgression(progression, 2, 16);
 
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(OSC_ADDRESSES.CREATE_PROGRESSION, {
-        trackIndex: 2,
-        startBeat: 16,
-        notes: [
-          { pitch: 60, startTime: 0, duration: 2, velocity: 100 },
-          { pitch: 64, startTime: 0, duration: 2, velocity: 100 },
-          { pitch: 67, startTime: 0, duration: 2, velocity: 100 },
-        ],
-      });
+      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith(
+        OSC_ADDRESSES.CREATE_PROGRESSION,
+        [2, 16, 60, 0, 2, 100, 64, 0, 2, 100, 67, 0, 2, 100],
+      );
     });
 
     it('should set tempo', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC, setTempo } = useLiveStore.getState();
       await initializeOSC();
@@ -324,14 +313,14 @@ describe('OSC Service Integration', () => {
     });
 
     it('should disconnect properly', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC, disconnect } = useLiveStore.getState();
       await initializeOSC();
 
       disconnect();
 
-      expect((window as any).electronAPI.sendOSC).toHaveBeenCalledWith('/chordgen/close', []);
+      expect((window as any).electronAPI.closeOSC).toHaveBeenCalled();
       expect(useLiveStore.getState().isConnected).toBe(false);
       expect(useLiveStore.getState().tracks).toEqual([]);
     });
@@ -339,7 +328,7 @@ describe('OSC Service Integration', () => {
 
   describe('Error Handling', () => {
     it('should handle OSC response messages', async () => {
-      (window as any).electronAPI.sendOSC.mockResolvedValue(undefined);
+      (window as any).electronAPI.initializeOSC.mockResolvedValue(true);
 
       const { initializeOSC } = useLiveStore.getState();
       await initializeOSC();

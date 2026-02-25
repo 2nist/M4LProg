@@ -8,22 +8,39 @@ import { OSC_ADDRESSES, OSCNote } from "../../types/osc";
 // Transport abstraction to decouple from window.electronAPI
 export interface OSCTransport {
   sendOSC: (address: string, args: any[]) => Promise<void> | void;
-  onOSCMessage: (cb: (message: any) => void) => void;
+  onOSCMessage: (cb: (message: any) => void) => (() => void) | void;
+  initializeOSC?: (sendPort?: number, receivePort?: number) => Promise<boolean>;
+  reconnectOSC?: () => Promise<boolean>;
+  closeOSC?: () => Promise<void> | void;
+  getOSCHealth?: () => Promise<OSCHealthSnapshot>;
 }
 
 let injectedTransport: OSCTransport | null = null;
+let unsubscribeFromMessages: (() => void) | null = null;
 
 // Message handlers storage
 let messageHandlers: Map<string, ((msg: any) => void)[]> = new Map();
 let isInitialized = false;
+
+export interface OSCHealthSnapshot {
+  status: "idle" | "connecting" | "connected" | "degraded" | "retrying" | "error";
+  isConnected: boolean;
+  isStale: boolean;
+  sendPort: number;
+  receivePort: number;
+  retryCount: number;
+  nextRetryMs: number;
+  lastMessageAt: number;
+  lastError: string | null;
+}
 
 /**
  * Initialize OSC communication
  */
 export async function initializeOSC(
   transport?: OSCTransport | null,
-  _sendPort: number = 11000,
-  _receivePort: number = 11001,
+  sendPort: number = 11000,
+  receivePort: number = 11001,
 ): Promise<boolean> {
   if (isInitialized) {
     return true;
@@ -33,16 +50,22 @@ export async function initializeOSC(
     // If a transport was provided, store it and use it, otherwise fallback to window.electronAPI
     if (transport) {
       injectedTransport = transport;
-      injectedTransport.onOSCMessage((message: any) => handleIncomingMessage(message));
-      await injectedTransport.sendOSC("/chordgen/initialize", []);
+      unsubscribeFromMessages = injectedTransport.onOSCMessage((message: any) =>
+        handleIncomingMessage(message),
+      ) as (() => void) | null;
+      if (injectedTransport.initializeOSC) {
+        const ok = await injectedTransport.initializeOSC(sendPort, receivePort);
+        if (!ok) return false;
+      }
     } else {
       // Set up message receiver from main process
-      window.electronAPI.onOSCMessage((message: any) => {
+      unsubscribeFromMessages = window.electronAPI.onOSCMessage((message: any) => {
         handleIncomingMessage(message);
       });
 
       // Initialize in main process
-      await window.electronAPI.sendOSC("/chordgen/initialize", []);
+      const ok = await window.electronAPI.initializeOSC(sendPort, receivePort);
+      if (!ok) return false;
     }
 
     isInitialized = true;
@@ -62,10 +85,7 @@ export async function initializeOSC(
  * Send handshake to M4L helper
  */
 function sendHandshake(): void {
-  sendOSCMessage(OSC_ADDRESSES.HANDSHAKE, {
-    version: "1.0.0",
-    clientId: "chordgen-pro",
-  });
+  sendOSCMessage(OSC_ADDRESSES.HANDSHAKE, ["1.0.0", "chordgen-pro"]);
 }
 
 /**
@@ -158,11 +178,17 @@ export function createProgression(
     currentBeat += chord.duration;
   });
 
-  sendOSCMessage(OSC_ADDRESSES.CREATE_PROGRESSION, {
+  const flatNotes = notes.flatMap((note) => [
+    note.pitch,
+    note.startTime,
+    note.duration,
+    note.velocity,
+  ]);
+  sendOSCMessage(OSC_ADDRESSES.CREATE_PROGRESSION, [
     trackIndex,
-    startBeat: startBeat ?? -1, // -1 means "current position"
-    notes,
-  });
+    startBeat ?? -1, // -1 means "current position"
+    ...flatNotes,
+  ]);
 }
 
 /**
@@ -243,10 +269,16 @@ export function closeOSC(): void {
   if (isInitialized) {
     try {
       if (injectedTransport) {
-        injectedTransport.sendOSC("/chordgen/close", []);
+        if (injectedTransport.closeOSC) {
+          injectedTransport.closeOSC();
+        } else {
+          injectedTransport.sendOSC("/chordgen/close", []);
+        }
       } else {
-        window.electronAPI.sendOSC("/chordgen/close", []);
+        window.electronAPI.closeOSC();
       }
+      unsubscribeFromMessages?.();
+      unsubscribeFromMessages = null;
       isInitialized = false;
       messageHandlers.clear();
       console.log("[OSC Renderer] Connection closed");
@@ -261,6 +293,40 @@ export function closeOSC(): void {
  */
 export function isOSCConnected(): boolean {
   return isInitialized;
+}
+
+export async function reconnectOSC(): Promise<boolean> {
+  try {
+    if (injectedTransport?.reconnectOSC) {
+      return await injectedTransport.reconnectOSC();
+    }
+    return await window.electronAPI.reconnectOSC();
+  } catch (error) {
+    console.error("[OSC Renderer] Reconnect failed:", error);
+    return false;
+  }
+}
+
+export async function getOSCHealth(): Promise<OSCHealthSnapshot> {
+  try {
+    if (injectedTransport?.getOSCHealth) {
+      return await injectedTransport.getOSCHealth();
+    }
+    return await window.electronAPI.getOSCHealth();
+  } catch (error) {
+    console.error("[OSC Renderer] Health read failed:", error);
+    return {
+      status: isInitialized ? "connected" : "idle",
+      isConnected: isInitialized,
+      isStale: false,
+      sendPort: 11000,
+      receivePort: 11001,
+      retryCount: 0,
+      nextRetryMs: 500,
+      lastMessageAt: 0,
+      lastError: error instanceof Error ? error.message : "unknown",
+    };
+  }
 }
 
 /**

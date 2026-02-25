@@ -18,15 +18,118 @@ let mainWindow: BrowserWindow | null = null;
 // ============================================================================
 const DEFAULT_SEND_PORT = 11000; // Electron → Max
 const DEFAULT_RECEIVE_PORT = 11001; // Max → Electron
+const OSC_STALE_MS = 5000;
+const OSC_HEARTBEAT_MS = 2000;
+const OSC_RETRY_BASE_MS = 500;
+const OSC_RETRY_MAX_MS = 8000;
 
 let udpPort: any = null;
 let isOSCConnected = false;
+let isOSCConnecting = false;
+let isOSCClosing = false;
+let oscSendPort = DEFAULT_SEND_PORT;
+let oscReceivePort = DEFAULT_RECEIVE_PORT;
+let oscLastMessageAt = 0;
+let oscLastError: string | null = null;
+let oscRetryCount = 0;
+let oscNextRetryMs = OSC_RETRY_BASE_MS;
+let oscRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let oscHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+type OSCConnectionStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "degraded"
+  | "retrying"
+  | "error";
+
+let oscStatus: OSCConnectionStatus = "idle";
+
+function getOSCHealth() {
+  const now = Date.now();
+  const stale = oscLastMessageAt > 0 && now - oscLastMessageAt > OSC_STALE_MS;
+  const status: OSCConnectionStatus =
+    isOSCConnecting
+      ? "connecting"
+      : isOSCConnected
+        ? stale
+          ? "degraded"
+          : "connected"
+        : oscStatus;
+
+  return {
+    status,
+    isConnected: isOSCConnected,
+    isStale: stale,
+    sendPort: oscSendPort,
+    receivePort: oscReceivePort,
+    retryCount: oscRetryCount,
+    nextRetryMs: oscNextRetryMs,
+    lastMessageAt: oscLastMessageAt,
+    lastError: oscLastError,
+  };
+}
+
+function clearOSCIntervals(): void {
+  if (oscHeartbeatTimer) {
+    clearInterval(oscHeartbeatTimer);
+    oscHeartbeatTimer = null;
+  }
+  if (oscRetryTimer) {
+    clearTimeout(oscRetryTimer);
+    oscRetryTimer = null;
+  }
+}
+
+function startHeartbeat(): void {
+  if (oscHeartbeatTimer) return;
+  oscHeartbeatTimer = setInterval(() => {
+    if (!isOSCConnected) return;
+    sendOSCMessage("/live/ping", [Date.now()]);
+  }, OSC_HEARTBEAT_MS);
+}
+
+function scheduleReconnect(): void {
+  if (isOSCClosing || oscRetryTimer) return;
+  oscStatus = "retrying";
+  const retryMs = oscNextRetryMs;
+  oscRetryTimer = setTimeout(() => {
+    oscRetryTimer = null;
+    initializeOSC(oscSendPort, oscReceivePort).catch((error) => {
+      oscLastError = error instanceof Error ? error.message : String(error);
+      scheduleReconnect();
+    });
+  }, retryMs);
+  oscNextRetryMs = Math.min(oscNextRetryMs * 2, OSC_RETRY_MAX_MS);
+}
 
 function initializeOSC(
   sendPort: number = DEFAULT_SEND_PORT,
   receivePort: number = DEFAULT_RECEIVE_PORT,
 ): Promise<boolean> {
   return new Promise((resolve) => {
+    if (isOSCConnecting) {
+      resolve(false);
+      return;
+    }
+    isOSCConnecting = true;
+    isOSCClosing = false;
+    oscSendPort = sendPort;
+    oscReceivePort = receivePort;
+    oscStatus = "connecting";
+    oscLastError = null;
+
+    if (udpPort) {
+      try {
+        udpPort.close();
+      } catch {
+        // Best effort
+      }
+      udpPort = null;
+      isOSCConnected = false;
+    }
+
     try {
       udpPort = new osc.UDPPort({
         localAddress: "127.0.0.1",
@@ -39,18 +142,27 @@ function initializeOSC(
       udpPort.on("ready", () => {
         console.log("[OSC] Server ready on port", receivePort);
         isOSCConnected = true;
+        isOSCConnecting = false;
+        oscStatus = "connected";
+        oscRetryCount = 0;
+        oscNextRetryMs = OSC_RETRY_BASE_MS;
+        oscLastError = null;
+        oscLastMessageAt = Date.now();
+        clearOSCIntervals();
+        startHeartbeat();
 
         // Send handshake
-        sendOSCMessage("/chordgen/handshake", {
-          version: "1.0.0",
-          clientId: "chordgen-pro",
-        });
+        sendOSCMessage("/live/handshake", ["1.0.0", "chordgen-pro"]);
 
         resolve(true);
       });
 
       udpPort.on("message", (oscMsg: any) => {
         console.log("[OSC] Received:", oscMsg.address, oscMsg.args);
+        oscLastMessageAt = Date.now();
+        if (oscStatus !== "connected") {
+          oscStatus = "connected";
+        }
 
         // Forward message to renderer process
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -65,12 +177,23 @@ function initializeOSC(
       udpPort.on("error", (error: any) => {
         console.error("[OSC] Error:", error);
         isOSCConnected = false;
+        isOSCConnecting = false;
+        oscRetryCount += 1;
+        oscLastError = error instanceof Error ? error.message : String(error);
+        oscStatus = "error";
+        scheduleReconnect();
         resolve(false);
       });
 
       udpPort.open();
     } catch (error) {
       console.error("[OSC] Failed to initialize:", error);
+      isOSCConnecting = false;
+      isOSCConnected = false;
+      oscRetryCount += 1;
+      oscLastError = error instanceof Error ? error.message : String(error);
+      oscStatus = "error";
+      scheduleReconnect();
       resolve(false);
     }
   });
@@ -96,12 +219,16 @@ function sendOSCMessage(address: string, args: any): void {
 }
 
 function closeOSC(): void {
+  isOSCClosing = true;
+  clearOSCIntervals();
   if (udpPort) {
     udpPort.close();
     udpPort = null;
-    isOSCConnected = false;
-    console.log("[OSC] Connection closed");
   }
+  isOSCConnected = false;
+  isOSCConnecting = false;
+  oscStatus = "idle";
+  console.log("[OSC] Connection closed");
 }
 
 // ============================================================================
@@ -222,6 +349,11 @@ function setupIPCHandlers(): void {
     return isOSCConnected;
   });
 
+  // OSC: Get health/status
+  ipcMain.handle("osc:getHealth", async () => {
+    return getOSCHealth();
+  });
+
   // OSC: Initialize/reconnect
   ipcMain.handle(
     "osc:initialize",
@@ -230,9 +362,23 @@ function setupIPCHandlers(): void {
     },
   );
 
+  // OSC: Force reconnect
+  ipcMain.handle("osc:reconnect", async () => {
+    closeOSC();
+    return await initializeOSC(oscSendPort, oscReceivePort);
+  });
+
   // OSC: Close connection
   ipcMain.handle("osc:close", async () => {
     closeOSC();
+  });
+
+  // MIDI (reserved): explicit no-op handlers to avoid renderer IPC failures.
+  ipcMain.handle("midi:getDevices", async () => {
+    return [];
+  });
+  ipcMain.handle("midi:send", async () => {
+    return false;
   });
 
   // File: Save

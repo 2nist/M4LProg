@@ -39,7 +39,8 @@ const DEFAULT_TEMPO = 120;
 const clampMidi = (value: number): number =>
   Math.max(0, Math.min(127, Math.round(value)));
 
-const safeDuration = (duration: number): number => Math.max(0.25, duration || 0.25);
+const safeDuration = (duration: number): number =>
+  Math.max(0.25, duration || 0.25);
 
 const getSectionProgressionForMode = (
   section: Section,
@@ -48,8 +49,8 @@ const getSectionProgressionForMode = (
   const modeId = mode as ModeId;
   const modeProgression = section.modeProgressions?.[modeId];
   if (Array.isArray(modeProgression)) return modeProgression;
-  if (modeId === "harmony") return section.progression || [];
-  return [];
+  // Fall back to main progression for any mode when modeProgressions is not defined
+  return section.progression || [];
 };
 
 export function buildArrangedChordEvents(
@@ -63,7 +64,10 @@ export function buildArrangedChordEvents(
   for (const block of sortedBlocks) {
     const section = sectionMap.get(block.sourceId);
     if (!section) continue;
-    const sectionProgression = getSectionProgressionForMode(section, block.mode);
+    const sectionProgression = getSectionProgressionForMode(
+      section,
+      block.mode,
+    );
     if (!Array.isArray(sectionProgression)) continue;
 
     const blockRepeats = Math.max(1, block.repeats || section.repeats || 1);
@@ -116,7 +120,8 @@ export function createArrangementSnapshot(params: {
   const timeSignature = params.timeSignature || "4/4";
   const events = buildArrangedChordEvents(params.sections, params.blocks);
   const totalBeats = events.reduce(
-    (maxBeat, event) => Math.max(maxBeat, event.startBeat + event.durationBeats),
+    (maxBeat, event) =>
+      Math.max(maxBeat, event.startBeat + event.durationBeats),
     0,
   );
 
@@ -132,7 +137,9 @@ export function createArrangementSnapshot(params: {
   };
 }
 
-export function toOscProgression(events: ArrangedChordEvent[]): OscProgressionChord[] {
+export function toOscProgression(
+  events: ArrangedChordEvent[],
+): OscProgressionChord[] {
   if (events.length === 0) return [];
   const sorted = [...events].sort((a, b) => a.startBeat - b.startBeat);
   const progression: OscProgressionChord[] = [];
@@ -179,7 +186,10 @@ function pushU32(target: number[], value: number): void {
   target.push(value & 0xff);
 }
 
-function parseTimeSignature(sig: string): { numerator: number; denominatorPow: number } {
+function parseTimeSignature(sig: string): {
+  numerator: number;
+  denominatorPow: number;
+} {
   const [numRaw, denRaw] = sig.split("/");
   const numerator = Math.max(1, Number(numRaw) || 4);
   const denominator = Math.max(1, Number(denRaw) || 4);
@@ -209,7 +219,10 @@ export function toMidiFileBytes(
   for (const event of events) {
     const startTick = Math.max(0, Math.round(event.startBeat * ppq));
     const gateScale = Math.max(0.01, event.gatePercent / 100);
-    const durationTicks = Math.max(1, Math.round(event.durationBeats * ppq * gateScale));
+    const durationTicks = Math.max(
+      1,
+      Math.round(event.durationBeats * ppq * gateScale),
+    );
     const endTick = startTick + durationTicks;
 
     event.notes.forEach((note) => {
@@ -235,7 +248,13 @@ export function toMidiFileBytes(
 
   const trackData: number[] = [];
   const pushMeta = (delta: number, metaType: number, data: number[]) => {
-    trackData.push(...encodeVarLen(delta), 0xff, metaType, ...encodeVarLen(data.length), ...data);
+    trackData.push(
+      ...encodeVarLen(delta),
+      0xff,
+      metaType,
+      ...encodeVarLen(data.length),
+      ...data,
+    );
   };
 
   pushMeta(0, 0x51, [

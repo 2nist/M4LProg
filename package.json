@@ -84,5 +84,6 @@
     "extends": [
       "plugin:storybook/recommended"
     ]
-  }
+  },
+  "type": "module"
 }

@@ -74,6 +74,15 @@ function HeaderModeArc() {
 
 function HeaderConnectionArray() {
   const isOscConnected = useLiveStore((s) => s.isConnected);
+  const oscConnectionStatus = useLiveStore((s) => s.connectionStatus);
+  const isOscStale = useLiveStore((s) => s.isConnectionStale);
+  const oscLastError = useLiveStore((s) => s.lastError);
+  const oscRetryCount = useLiveStore((s) => s.retryCount);
+  const oscSendPort = useLiveStore((s) => s.sendPort);
+  const oscReceivePort = useLiveStore((s) => s.receivePort);
+  const connectOSC = useLiveStore((s) => s.initializeOSC);
+  const reconnectOSC = useLiveStore((s) => s.reconnectOSC);
+  const disconnectOSC = useLiveStore((s) => s.disconnect);
   const isMidiConnected = useHardwareStore((s) => s.isConnected);
   const oscOutRoute = useRoutingStore((s) => s.oscOutRoute);
   const midiOutRoute = useRoutingStore((s) => s.midiOutRoute);
@@ -277,7 +286,34 @@ function HeaderConnectionArray() {
       >
         <div className="routing-modal-content">
           <div className="routing-modal-caption">
-            Connection: {isOscConnected ? "connected" : "disconnected"}.
+            Status: {oscConnectionStatus}
+            {isOscStale ? " (stale)" : ""}. Ports: send {oscSendPort} / receive {oscReceivePort}.
+          </div>
+          <div className="routing-inline-controls">
+            <button
+              type="button"
+              className="btn-small"
+              onClick={() => connectOSC()}
+            >
+              Connect
+            </button>
+            <button
+              type="button"
+              className="btn-small"
+              onClick={() => reconnectOSC()}
+            >
+              Reconnect
+            </button>
+            <button
+              type="button"
+              className="btn-small"
+              onClick={() => disconnectOSC()}
+            >
+              Disconnect
+            </button>
+          </div>
+          <div className="routing-modal-caption">
+            Retry count: {oscRetryCount}. Last error: {oscLastError || "none"}.
           </div>
           {getAdaptersByTransport("osc").map((adapter) =>
             renderAdapterOption(adapter, "oscOutRoute", oscOutRoute),

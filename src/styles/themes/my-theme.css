@@ -1,0 +1,33 @@
+/* Example theme: my-theme.css
+   Minimal theme that sets only CSS variables. Drop-in replacement
+   to demonstrate how to integrate a custom style without touching
+   component CSS. */
+:root {
+  --background: #0b0b0f;
+  --foreground: #f6f6f2;
+  --card: #0f1113;
+  --card-foreground: #f6f6f2;
+  --popover: #0d0f11;
+  --popover-foreground: #f6f6f2;
+  --primary: #ff6b6b;
+  --primary-foreground: #ffffff;
+  --secondary: #7c5cff;
+  --secondary-foreground: #ffffff;
+  --muted: #121214;
+  --muted-foreground: #cfcfcf;
+  --accent: #ffb86b;
+  --accent-foreground: #000000;
+  --destructive: #e55353;
+  --destructive-foreground: #ffffff;
+  --border: #222228;
+  --input: #1a1a1f;
+  --ring: #ff6b6b;
+  --chart-1: #ff6b6b;
+  --chart-2: #7c5cff;
+  --chart-3: #ffb86b;
+  --chart-4: #c792ea;
+  --chart-5: #7bee7b;
+  --sidebar: #0b0b0f;
+  --sidebar-foreground: #f6f6f2;
+  --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
