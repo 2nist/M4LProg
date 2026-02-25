@@ -7,7 +7,6 @@
  */
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { Section, ProgressionSnapshot } from "../types/progression";
 import type { Pattern } from "../types/pattern";
 import type { Progression, Chord } from "../types/chord";
@@ -15,10 +14,7 @@ import type { ModaleName } from "@services/musicTheory/MusicTheoryEngine";
 import type { ArrangementBlock, ModeId } from "@/types/arrangement";
 import * as ProgressionManager from "@services/progression/ProgressionManager";
 
-const getSectionProgression = (
-  section: Section,
-  mode: ModeId,
-): Progression => {
+const getSectionProgression = (section: Section, mode: ModeId): Progression => {
   const modeProgression = section.modeProgressions?.[mode];
   if (Array.isArray(modeProgression)) return modeProgression;
   if (mode === "harmony") return section.progression || [];
@@ -55,7 +51,9 @@ const setSectionProgression = (
 };
 
 const normalizeSection = (section: Section): Section => {
-  const harmony = ProgressionManager.cloneProgression(section.progression || []);
+  const harmony = ProgressionManager.cloneProgression(
+    section.progression || [],
+  );
   return {
     ...section,
     progression: harmony,
@@ -63,8 +61,12 @@ const normalizeSection = (section: Section): Section => {
       harmony: ProgressionManager.cloneProgression(
         section.modeProgressions?.harmony || harmony,
       ),
-      drum: ProgressionManager.cloneProgression(section.modeProgressions?.drum || []),
-      other: ProgressionManager.cloneProgression(section.modeProgressions?.other || []),
+      drum: ProgressionManager.cloneProgression(
+        section.modeProgressions?.drum || [],
+      ),
+      other: ProgressionManager.cloneProgression(
+        section.modeProgressions?.other || [],
+      ),
     },
   };
 };
@@ -171,10 +173,7 @@ interface ProgressionState {
   deleteArrangementBlock: (blockId: string) => void;
   reorderArrangementBlock: (fromIndex: number, toIndex: number) => void;
   setArrangementBlockRepeats: (blockId: string, repeats: number) => void;
-  setArrangementBlockMidiChannel: (
-    blockId: string,
-    channel?: number,
-  ) => void;
+  setArrangementBlockMidiChannel: (blockId: string, channel?: number) => void;
 
   /** Select a progression slot for editing */
   selectSlot: (index: number | null) => void;
@@ -317,608 +316,566 @@ const initialState = {
   savedProgressions: {},
 };
 
-export const useProgressionStore = create<ProgressionState>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
-
-      // ============================================================================
-      // Diatonic Chord Builder State
-      // ============================================================================
-
-      setKeyRoot: (root: number) => {
-        set({ keyRoot: root });
-      },
-
-      setMode: (mode: ModaleName) => {
-        set({ mode });
-      },
-
-      setUiMode: (mode: ModeId) => {
-        set({ uiMode: mode });
-      },
-
-      selectArrangementBlock: (blockId: string | null) => {
-        set({ selectedArrangementBlockId: blockId });
-      },
-
-      setArrangementBlocks: (blocks: ArrangementBlock[]) => {
-        const { sections, uiMode } = get();
-        const nextBlocks = normalizeArrangementBlocks(
-          blocks,
-          sections,
-          uiMode,
-          false,
-        );
-        const selected = get().selectedArrangementBlockId;
-        const keepSelected =
-          selected && nextBlocks.some((block) => block.id === selected)
-            ? selected
-            : null;
-        set({
-          arrangementBlocks: nextBlocks,
-          selectedArrangementBlockId: keepSelected,
-        });
-      },
-
-      rebuildArrangementFromSections: () => {
-        const { sections, uiMode } = get();
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(
-            [],
-            sections,
-            uiMode,
-            true,
-          ),
-          selectedArrangementBlockId: null,
-        });
-      },
-
-      addArrangementBlockFromSection: (sectionId: string, mode?: ModeId) => {
-        const { sections, arrangementBlocks, uiMode } = get();
-        const section = sections.find((s) => s.id === sectionId);
-        if (!section) return;
-        const repeats = Math.max(1, section.repeats || 1);
-        const nextBlock: ArrangementBlock = {
-          id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
-          sourceId: section.id,
-          mode: mode || uiMode,
-          startBeat: 0,
-          lengthBeats: getSectionBaseBeats(section, mode || uiMode) * repeats,
-          label: section.name || "Section",
-          repeats,
-          intent: "main",
-        };
-        const nextBlocks = normalizeArrangementBlocks(
-          [...arrangementBlocks, nextBlock],
-          sections,
-          uiMode,
-          false,
-        );
-        set({ arrangementBlocks: nextBlocks });
-      },
-
-      duplicateArrangementBlock: (blockId: string) => {
-        const { arrangementBlocks, sections, uiMode } = get();
-        const index = arrangementBlocks.findIndex((block) => block.id === blockId);
-        if (index < 0) return;
-        const source = arrangementBlocks[index];
-        const duplicate: ArrangementBlock = {
-          ...source,
-          id: `arr-${source.sourceId}-${Math.random().toString(36).slice(2, 8)}`,
-        };
-        const next = [
-          ...arrangementBlocks.slice(0, index + 1),
-          duplicate,
-          ...arrangementBlocks.slice(index + 1),
-        ];
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
-        });
-      },
-
-      deleteArrangementBlock: (blockId: string) => {
-        const { arrangementBlocks, sections, uiMode } = get();
-        const next = arrangementBlocks.filter((block) => block.id !== blockId);
-        const selected = get().selectedArrangementBlockId;
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
-          selectedArrangementBlockId:
-            selected === blockId ? null : selected,
-        });
-      },
-
-      reorderArrangementBlock: (fromIndex: number, toIndex: number) => {
-        const { arrangementBlocks, sections, uiMode } = get();
-        if (
-          fromIndex === toIndex ||
-          fromIndex < 0 ||
-          toIndex < 0 ||
-          fromIndex >= arrangementBlocks.length ||
-          toIndex >= arrangementBlocks.length
-        ) {
-          return;
-        }
-        const next = [...arrangementBlocks];
-        const [moved] = next.splice(fromIndex, 1);
-        next.splice(toIndex, 0, moved);
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
-        });
-      },
-
-      setArrangementBlockRepeats: (blockId: string, repeats: number) => {
-        const { arrangementBlocks, sections, uiMode } = get();
-        const safeRepeats = Math.max(1, Math.floor(repeats || 1));
-        const next = arrangementBlocks.map((block) =>
-          block.id === blockId ? { ...block, repeats: safeRepeats } : block,
-        );
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
-        });
-      },
-
-      setArrangementBlockMidiChannel: (blockId: string, channel?: number) => {
-        const { arrangementBlocks, sections, uiMode } = get();
-        const safeChannel = sanitizeMidiChannel(channel);
-        const next = arrangementBlocks.map((block) =>
-          block.id === blockId
-            ? { ...block, midiChannel: safeChannel }
-            : block,
-        );
-        set({
-          arrangementBlocks: normalizeArrangementBlocks(next, sections, uiMode, false),
-        });
-      },
-
-      selectSlot: (index: number | null) => {
-        set({ selectedSlot: index });
-      },
-
-      // ============================================================================
-      // Section Management
-      // ============================================================================
-
-      getCurrentSection: () => {
-        const { sections, currentSectionIndex } = get();
-        return sections[currentSectionIndex] || sections[0];
-      },
-
-      // Left drawer UI state
-      openDrawer: null,
-      setOpenDrawer: (name: string | null) => {
-        set(() => ({ openDrawer: name }));
-      },
-
-      loadSection: (index: number) => {
-        const { sections } = get();
-        if (index >= 0 && index < sections.length) {
-          set({ currentSectionIndex: index });
-        }
-      },
-
-      setSections: (sections: Section[], nextIndex?: number) => {
-        const safeSections =
-          sections.length > 0
-            ? sections.map((section) => normalizeSection(ProgressionManager.cloneSection(section)))
-            : [ProgressionManager.createEmptySection("Section 1")];
-        const safeIndex = Math.max(
-          0,
-          Math.min(
-            safeSections.length - 1,
-            nextIndex ?? get().currentSectionIndex,
-          ),
-        );
-        set({
-          sections: safeSections,
-          arrangementBlocks: normalizeArrangementBlocks(
-            [],
-            safeSections,
-            get().uiMode,
-            true,
-          ),
-          selectedArrangementBlockId: null,
-          currentSectionIndex: safeIndex,
-          selectedSlot: null,
-        });
-      },
-
-      updateCurrentSection: (section: Section) => {
-        const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
-        const newSections = [...sections];
-        newSections[currentSectionIndex] = normalizeSection(
-          ProgressionManager.cloneSection(section),
-        );
-        set({
-          sections: newSections,
-          arrangementBlocks: normalizeArrangementBlocks(
-            arrangementBlocks,
-            newSections,
-            uiMode,
-            false,
-          ),
-        });
-      },
-
-      moveSection: (offset: number) => {
-        const { sections, currentSectionIndex } = get();
-        const newIndex = Math.max(
-          0,
-          Math.min(sections.length - 1, currentSectionIndex + offset),
-        );
-        set({ currentSectionIndex: newIndex });
-      },
-
-      createSection: (name?: string) => {
-        const { sections } = get();
-        const sectionName = name || `Section ${sections.length + 1}`;
-        const newSection = ProgressionManager.createEmptySection(sectionName);
-        set({
-          sections: [...sections, newSection],
-          currentSectionIndex: sections.length,
-        });
-      },
-
-      deleteSection: (index: number) => {
-        const {
-          sections,
-          currentSectionIndex,
-          arrangementBlocks,
-          selectedArrangementBlockId,
-          uiMode,
-        } = get();
-
-        // Don't delete if it's the last section
-        if (sections.length <= 1) return;
-
-        const removedSectionId = sections[index]?.id;
-        const newSections = sections.filter((_, i) => i !== index);
-        const newIndex =
-          currentSectionIndex >= newSections.length
-            ? newSections.length - 1
-            : currentSectionIndex;
-        const filteredBlocks = arrangementBlocks.filter(
-          (block) => block.sourceId !== removedSectionId,
-        );
-        const nextBlocks = normalizeArrangementBlocks(
-          filteredBlocks,
-          newSections,
-          uiMode,
-          false,
-        );
-        const nextSelected =
-          selectedArrangementBlockId &&
-          nextBlocks.some((block) => block.id === selectedArrangementBlockId)
-            ? selectedArrangementBlockId
-            : null;
-
-        set({
-          sections: newSections,
-          arrangementBlocks: nextBlocks,
-          selectedArrangementBlockId: nextSelected,
-          currentSectionIndex: newIndex,
-        });
-      },
-
-      renameSection: (name: string) => {
-        const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
-        const newSections = [...sections];
-        newSections[currentSectionIndex] = {
-          ...newSections[currentSectionIndex],
-          name,
-        };
-        set({
-          sections: newSections,
-          arrangementBlocks: normalizeArrangementBlocks(
-            arrangementBlocks,
-            newSections,
-            uiMode,
-            false,
-          ),
-        });
-      },
-
-      renameSectionAt: (index: number, name: string) => {
-        const { sections, arrangementBlocks, uiMode } = get();
-        if (index < 0 || index >= sections.length) return;
-        const newSections = [...sections];
-        newSections[index] = { ...newSections[index], name };
-        set({
-          sections: newSections,
-          arrangementBlocks: normalizeArrangementBlocks(
-            arrangementBlocks,
-            newSections,
-            uiMode,
-            false,
-          ),
-        });
-      },
-
-      reorderSection: (fromIndex: number, toIndex: number) => {
-        const { sections, currentSectionIndex } = get();
-        if (
-          fromIndex === toIndex ||
-          fromIndex < 0 ||
-          fromIndex >= sections.length ||
-          toIndex < 0 ||
-          toIndex >= sections.length
-        ) {
-          return;
-        }
-
-        const newSections = [...sections];
-        const [movedSection] = newSections.splice(fromIndex, 1);
-        newSections.splice(toIndex, 0, movedSection);
-
-        // Update current section index if needed
-        let newCurrentIndex = currentSectionIndex;
-        if (currentSectionIndex === fromIndex) {
-          newCurrentIndex = toIndex;
-        } else if (
-          fromIndex < currentSectionIndex &&
-          toIndex >= currentSectionIndex
-        ) {
-          newCurrentIndex = currentSectionIndex - 1;
-        } else if (
-          fromIndex > currentSectionIndex &&
-          toIndex <= currentSectionIndex
-        ) {
-          newCurrentIndex = currentSectionIndex + 1;
-        }
-
-        set({
-          sections: newSections,
-          currentSectionIndex: newCurrentIndex,
-        });
-      },
-
-      duplicateSection: (index: number) => {
-        const { sections } = get();
-        if (index < 0 || index >= sections.length) return;
-
-        const sectionToDuplicate = sections[index];
-        const duplicated = {
-          ...ProgressionManager.cloneSection(sectionToDuplicate),
-          id: crypto.randomUUID(), // New UUID for duplicate
-          name: `${sectionToDuplicate.name} (Copy)`,
-        };
-
-        const newSections = [
-          ...sections.slice(0, index + 1),
-          duplicated,
-          ...sections.slice(index + 1),
-        ];
-
-        set({ sections: newSections });
-      },
-
-      // ============================================================================
-      // Progression Editing
-      // ============================================================================
-
-      addChord: (chord: Chord) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const progression = getSectionProgression(section, uiMode);
-        const updatedSection = setSectionProgression(section, uiMode, [
-          ...progression,
-          chord,
-        ]);
-        get().updateCurrentSection(updatedSection);
-      },
-
-      removeChord: (index: number) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const progression = getSectionProgression(section, uiMode);
-        const updatedSection = setSectionProgression(
-          section,
-          uiMode,
-          progression.filter((_, i) => i !== index),
-        );
-        get().updateCurrentSection(updatedSection);
-      },
-
-      updateChord: (index: number, chord: Chord) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const newProgression = [...getSectionProgression(section, uiMode)];
-        newProgression[index] = chord;
-        const updatedSection = setSectionProgression(
-          section,
-          uiMode,
-          newProgression,
-        );
-        get().updateCurrentSection(updatedSection);
-      },
-
-      insertChord: (index: number, chord: Chord) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const newProgression = [...getSectionProgression(section, uiMode)];
-        newProgression.splice(index, 0, chord);
-        const updatedSection = setSectionProgression(
-          section,
-          uiMode,
-          newProgression,
-        );
-        get().updateCurrentSection(updatedSection);
-      },
-
-      clearProgression: () => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const updatedSection = setSectionProgression(section, uiMode, []);
-        get().updateCurrentSection(updatedSection);
-      },
-
-      setProgression: (progression: Progression) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const updatedSection = setSectionProgression(section, uiMode, progression);
-        get().updateCurrentSection(updatedSection);
-      },
-
-      // ============================================================================
-      // Pattern Management
-      // ============================================================================
-
-      addCustomPattern: (pattern: Pattern) => {
-        const { customPatterns } = get();
-
-        // Check if pattern with this ID already exists
-        const exists = customPatterns.some((p) => p.id === pattern.id);
-        if (exists) {
-          // Replace existing pattern
-          set({
-            customPatterns: customPatterns.map((p) =>
-              p.id === pattern.id ? pattern : p,
-            ),
-          });
-        } else {
-          // Add new pattern
-          set({
-            customPatterns: [...customPatterns, pattern],
-          });
-        }
-      },
-
-      removeCustomPattern: (patternId: string) => {
-        const { customPatterns } = get();
-        set({
-          customPatterns: customPatterns.filter((p) => p.id !== patternId),
-        });
-      },
-
-      getAllPatterns: () => {
-        const { customPatterns } = get();
-        return ProgressionManager.getPatternDefinitions(customPatterns);
-      },
-
-      applyPatternToSection: (patternId: string, root: number = 60) => {
-        const { customPatterns } = get();
-        const progression = ProgressionManager.applyPattern(
-          patternId,
-          { root },
-          customPatterns,
-        );
-
-        if (progression) {
-          get().setProgression(progression);
-        }
-      },
-
-      // ============================================================================
-      // Saved Progressions
-      // ============================================================================
-
-      saveProgression: (
-        name: string,
-        metadata?: Partial<ProgressionSnapshot["metadata"]>,
-      ) => {
-        const section = get().getCurrentSection();
-        const { uiMode } = get();
-        const snapshot = ProgressionManager.createProgressionSnapshot(
-          name,
-          getSectionProgression(section, uiMode),
-          metadata,
-        );
-
-        const { savedProgressions } = get();
-        set({
-          savedProgressions: {
-            ...savedProgressions,
-            [name]: snapshot,
-          },
-        });
-      },
-
-      loadProgression: (name: string) => {
-        const { savedProgressions } = get();
-        const snapshot = savedProgressions[name];
-
-        if (snapshot) {
-          const progression =
-            ProgressionManager.loadProgressionFromSnapshot(snapshot);
-          get().setProgression(progression);
-        }
-      },
-
-      deleteProgression: (name: string) => {
-        const { savedProgressions } = get();
-        const newProgressions = { ...savedProgressions };
-        delete newProgressions[name];
-        set({ savedProgressions: newProgressions });
-      },
-
-      getSavedProgressionNames: () => {
-        const { savedProgressions } = get();
-        return Object.keys(savedProgressions).sort();
-      },
-
-      // ============================================================================
-      // Utility Actions
-      // ============================================================================
-
-      reset: () => {
-        set(initialState);
-      },
-    }),
-    {
-      name: "progression-storage", // LocalStorage key
-      partialize: (state) => ({
-        // Only persist these fields
-        keyRoot: state.keyRoot,
-        mode: state.mode,
-        uiMode: state.uiMode,
-        sections: state.sections,
-        arrangementBlocks: state.arrangementBlocks,
-        currentSectionIndex: state.currentSectionIndex,
-        customPatterns: state.customPatterns,
-        savedProgressions: state.savedProgressions,
-      }),
-    },
-  ),
-);
-
-// Sanitize persisted sections in localStorage (assign UUIDs if missing)
-// This runs once on module load to avoid react-beautiful-dnd errors from old persisted data.
-(() => {
-  try {
-    const keysToTry = ["progression-storage", "zustand:progression-storage"];
-
-    for (const key of keysToTry) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      let parsed: any;
-      try {
-        parsed = JSON.parse(raw);
-      } catch (e) {
-        continue;
-      }
-
-      // Zustand persist may wrap state under { state: {...} }
-      const stateObj = parsed.state ?? parsed;
-      if (!stateObj || !Array.isArray(stateObj.sections)) continue;
-
-      const needFix = stateObj.sections.some((s: any) => !s || !s.id);
-      if (!needFix) continue;
-
-      stateObj.sections = stateObj.sections.map((s: any) => ({
-        ...(s || {}),
-        id: s?.id ?? crypto.randomUUID(),
-      }));
-
-      const out = parsed.state ? { ...parsed, state: stateObj } : stateObj;
-      localStorage.setItem(key, JSON.stringify(out));
-      // Once fixed, no need to try other keys
-      break;
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      "progressionStore: failed to sanitize persisted sections",
-      err,
+// Simple in-memory store without persistence (persistence causes freezing due to localStorage writes)
+// To add persistence back, use zustand's persist with a proper storage adapter
+export const useProgressionStore = create<ProgressionState>()((set, get) => ({
+  ...initialState,
+
+  // ============================================================================
+  // Diatonic Chord Builder State
+  // ============================================================================
+
+  setKeyRoot: (root: number) => {
+    set({ keyRoot: root });
+  },
+
+  setMode: (mode: ModaleName) => {
+    set({ mode });
+  },
+
+  setUiMode: (mode: ModeId) => {
+    set({ uiMode: mode });
+  },
+
+  selectArrangementBlock: (blockId: string | null) => {
+    set({ selectedArrangementBlockId: blockId });
+  },
+
+  setArrangementBlocks: (blocks: ArrangementBlock[]) => {
+    const { sections, uiMode } = get();
+    const nextBlocks = normalizeArrangementBlocks(
+      blocks,
+      sections,
+      uiMode,
+      false,
     );
-  }
-})();
+    const selected = get().selectedArrangementBlockId;
+    const keepSelected =
+      selected && nextBlocks.some((block) => block.id === selected)
+        ? selected
+        : null;
+    set({
+      arrangementBlocks: nextBlocks,
+      selectedArrangementBlockId: keepSelected,
+    });
+  },
+
+  rebuildArrangementFromSections: () => {
+    const { sections, uiMode } = get();
+    set({
+      arrangementBlocks: normalizeArrangementBlocks([], sections, uiMode, true),
+      selectedArrangementBlockId: null,
+    });
+  },
+
+  addArrangementBlockFromSection: (sectionId: string, mode?: ModeId) => {
+    const { sections, arrangementBlocks, uiMode } = get();
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+    const repeats = Math.max(1, section.repeats || 1);
+    const nextBlock: ArrangementBlock = {
+      id: `arr-${section.id}-${Math.random().toString(36).slice(2, 8)}`,
+      sourceId: section.id,
+      mode: mode || uiMode,
+      startBeat: 0,
+      lengthBeats: getSectionBaseBeats(section, mode || uiMode) * repeats,
+      label: section.name || "Section",
+      repeats,
+      intent: "main",
+    };
+    const nextBlocks = normalizeArrangementBlocks(
+      [...arrangementBlocks, nextBlock],
+      sections,
+      uiMode,
+      false,
+    );
+    set({ arrangementBlocks: nextBlocks });
+  },
+
+  duplicateArrangementBlock: (blockId: string) => {
+    const { arrangementBlocks, sections, uiMode } = get();
+    const index = arrangementBlocks.findIndex((block) => block.id === blockId);
+    if (index < 0) return;
+    const source = arrangementBlocks[index];
+    const duplicate: ArrangementBlock = {
+      ...source,
+      id: `arr-${source.sourceId}-${Math.random().toString(36).slice(2, 8)}`,
+    };
+    const next = [
+      ...arrangementBlocks.slice(0, index + 1),
+      duplicate,
+      ...arrangementBlocks.slice(index + 1),
+    ];
+    set({
+      arrangementBlocks: normalizeArrangementBlocks(
+        next,
+        sections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  deleteArrangementBlock: (blockId: string) => {
+    const { arrangementBlocks, sections, uiMode } = get();
+    const next = arrangementBlocks.filter((block) => block.id !== blockId);
+    const selected = get().selectedArrangementBlockId;
+    set({
+      arrangementBlocks: normalizeArrangementBlocks(
+        next,
+        sections,
+        uiMode,
+        false,
+      ),
+      selectedArrangementBlockId: selected === blockId ? null : selected,
+    });
+  },
+
+  reorderArrangementBlock: (fromIndex: number, toIndex: number) => {
+    const { arrangementBlocks, sections, uiMode } = get();
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= arrangementBlocks.length ||
+      toIndex >= arrangementBlocks.length
+    ) {
+      return;
+    }
+    const next = [...arrangementBlocks];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    set({
+      arrangementBlocks: normalizeArrangementBlocks(
+        next,
+        sections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  setArrangementBlockRepeats: (blockId: string, repeats: number) => {
+    const { arrangementBlocks, sections, uiMode } = get();
+    const safeRepeats = Math.max(1, Math.floor(repeats || 1));
+    const next = arrangementBlocks.map((block) =>
+      block.id === blockId ? { ...block, repeats: safeRepeats } : block,
+    );
+    set({
+      arrangementBlocks: normalizeArrangementBlocks(
+        next,
+        sections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  setArrangementBlockMidiChannel: (blockId: string, channel?: number) => {
+    const { arrangementBlocks, sections, uiMode } = get();
+    const safeChannel = sanitizeMidiChannel(channel);
+    const next = arrangementBlocks.map((block) =>
+      block.id === blockId ? { ...block, midiChannel: safeChannel } : block,
+    );
+    set({
+      arrangementBlocks: normalizeArrangementBlocks(
+        next,
+        sections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  selectSlot: (index: number | null) => {
+    set({ selectedSlot: index });
+  },
+
+  // ============================================================================
+  // Section Management
+  // ============================================================================
+
+  getCurrentSection: () => {
+    const { sections, currentSectionIndex } = get();
+    return sections[currentSectionIndex] || sections[0];
+  },
+
+  // Left drawer UI state
+  openDrawer: null,
+  setOpenDrawer: (name: string | null) => {
+    set(() => ({ openDrawer: name }));
+  },
+
+  loadSection: (index: number) => {
+    const { sections } = get();
+    if (index >= 0 && index < sections.length) {
+      set({ currentSectionIndex: index });
+    }
+  },
+
+  setSections: (sections: Section[], nextIndex?: number) => {
+    const safeSections =
+      sections.length > 0
+        ? sections.map((section) =>
+            normalizeSection(ProgressionManager.cloneSection(section)),
+          )
+        : [ProgressionManager.createEmptySection("Section 1")];
+    const safeIndex = Math.max(
+      0,
+      Math.min(safeSections.length - 1, nextIndex ?? get().currentSectionIndex),
+    );
+    set({
+      sections: safeSections,
+      arrangementBlocks: normalizeArrangementBlocks(
+        [],
+        safeSections,
+        get().uiMode,
+        true,
+      ),
+      selectedArrangementBlockId: null,
+      currentSectionIndex: safeIndex,
+      selectedSlot: null,
+    });
+  },
+
+  updateCurrentSection: (section: Section) => {
+    const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
+    const newSections = [...sections];
+    newSections[currentSectionIndex] = normalizeSection(
+      ProgressionManager.cloneSection(section),
+    );
+    set({
+      sections: newSections,
+      arrangementBlocks: normalizeArrangementBlocks(
+        arrangementBlocks,
+        newSections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  moveSection: (offset: number) => {
+    const { sections, currentSectionIndex } = get();
+    const newIndex = Math.max(
+      0,
+      Math.min(sections.length - 1, currentSectionIndex + offset),
+    );
+    set({ currentSectionIndex: newIndex });
+  },
+
+  createSection: (name?: string) => {
+    const { sections } = get();
+    const sectionName = name || `Section ${sections.length + 1}`;
+    const newSection = ProgressionManager.createEmptySection(sectionName);
+    set({
+      sections: [...sections, newSection],
+      currentSectionIndex: sections.length,
+    });
+  },
+
+  deleteSection: (index: number) => {
+    const {
+      sections,
+      currentSectionIndex,
+      arrangementBlocks,
+      selectedArrangementBlockId,
+      uiMode,
+    } = get();
+
+    // Don't delete if it's the last section
+    if (sections.length <= 1) return;
+
+    const removedSectionId = sections[index]?.id;
+    const newSections = sections.filter((_, i) => i !== index);
+    const newIndex =
+      currentSectionIndex >= newSections.length
+        ? newSections.length - 1
+        : currentSectionIndex;
+    const filteredBlocks = arrangementBlocks.filter(
+      (block) => block.sourceId !== removedSectionId,
+    );
+    const nextBlocks = normalizeArrangementBlocks(
+      filteredBlocks,
+      newSections,
+      uiMode,
+      false,
+    );
+    const nextSelected =
+      selectedArrangementBlockId &&
+      nextBlocks.some((block) => block.id === selectedArrangementBlockId)
+        ? selectedArrangementBlockId
+        : null;
+
+    set({
+      sections: newSections,
+      arrangementBlocks: nextBlocks,
+      selectedArrangementBlockId: nextSelected,
+      currentSectionIndex: newIndex,
+    });
+  },
+
+  renameSection: (name: string) => {
+    const { sections, currentSectionIndex, arrangementBlocks, uiMode } = get();
+    const newSections = [...sections];
+    newSections[currentSectionIndex] = {
+      ...newSections[currentSectionIndex],
+      name,
+    };
+    set({
+      sections: newSections,
+      arrangementBlocks: normalizeArrangementBlocks(
+        arrangementBlocks,
+        newSections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  renameSectionAt: (index: number, name: string) => {
+    const { sections, arrangementBlocks, uiMode } = get();
+    if (index < 0 || index >= sections.length) return;
+    const newSections = [...sections];
+    newSections[index] = { ...newSections[index], name };
+    set({
+      sections: newSections,
+      arrangementBlocks: normalizeArrangementBlocks(
+        arrangementBlocks,
+        newSections,
+        uiMode,
+        false,
+      ),
+    });
+  },
+
+  reorderSection: (fromIndex: number, toIndex: number) => {
+    const { sections, currentSectionIndex } = get();
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      fromIndex >= sections.length ||
+      toIndex < 0 ||
+      toIndex >= sections.length
+    ) {
+      return;
+    }
+
+    const newSections = [...sections];
+    const [movedSection] = newSections.splice(fromIndex, 1);
+    newSections.splice(toIndex, 0, movedSection);
+
+    // Update current section index if needed
+    let newCurrentIndex = currentSectionIndex;
+    if (currentSectionIndex === fromIndex) {
+      newCurrentIndex = toIndex;
+    } else if (
+      fromIndex < currentSectionIndex &&
+      toIndex >= currentSectionIndex
+    ) {
+      newCurrentIndex = currentSectionIndex - 1;
+    } else if (
+      fromIndex > currentSectionIndex &&
+      toIndex <= currentSectionIndex
+    ) {
+      newCurrentIndex = currentSectionIndex + 1;
+    }
+
+    set({
+      sections: newSections,
+      currentSectionIndex: newCurrentIndex,
+    });
+  },
+
+  duplicateSection: (index: number) => {
+    const { sections } = get();
+    if (index < 0 || index >= sections.length) return;
+
+    const sectionToDuplicate = sections[index];
+    const duplicated = {
+      ...ProgressionManager.cloneSection(sectionToDuplicate),
+      id: crypto.randomUUID(), // New UUID for duplicate
+      name: `${sectionToDuplicate.name} (Copy)`,
+    };
+
+    const newSections = [
+      ...sections.slice(0, index + 1),
+      duplicated,
+      ...sections.slice(index + 1),
+    ];
+
+    set({ sections: newSections });
+  },
+
+  // ============================================================================
+  // Progression Editing
+  // ============================================================================
+
+  addChord: (chord: Chord) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const progression = getSectionProgression(section, uiMode);
+    const updatedSection = setSectionProgression(section, uiMode, [
+      ...progression,
+      chord,
+    ]);
+    get().updateCurrentSection(updatedSection);
+  },
+
+  removeChord: (index: number) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const progression = getSectionProgression(section, uiMode);
+    const updatedSection = setSectionProgression(
+      section,
+      uiMode,
+      progression.filter((_, i) => i !== index),
+    );
+    get().updateCurrentSection(updatedSection);
+  },
+
+  updateChord: (index: number, chord: Chord) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const newProgression = [...getSectionProgression(section, uiMode)];
+    newProgression[index] = chord;
+    const updatedSection = setSectionProgression(
+      section,
+      uiMode,
+      newProgression,
+    );
+    get().updateCurrentSection(updatedSection);
+  },
+
+  insertChord: (index: number, chord: Chord) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const newProgression = [...getSectionProgression(section, uiMode)];
+    newProgression.splice(index, 0, chord);
+    const updatedSection = setSectionProgression(
+      section,
+      uiMode,
+      newProgression,
+    );
+    get().updateCurrentSection(updatedSection);
+  },
+
+  clearProgression: () => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const updatedSection = setSectionProgression(section, uiMode, []);
+    get().updateCurrentSection(updatedSection);
+  },
+
+  setProgression: (progression: Progression) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const updatedSection = setSectionProgression(section, uiMode, progression);
+    get().updateCurrentSection(updatedSection);
+  },
+
+  // ============================================================================
+  // Pattern Management
+  // ============================================================================
+
+  addCustomPattern: (pattern: Pattern) => {
+    const { customPatterns } = get();
+
+    // Check if pattern with this ID already exists
+    const exists = customPatterns.some((p) => p.id === pattern.id);
+    if (exists) {
+      // Replace existing pattern
+      set({
+        customPatterns: customPatterns.map((p) =>
+          p.id === pattern.id ? pattern : p,
+        ),
+      });
+    } else {
+      // Add new pattern
+      set({
+        customPatterns: [...customPatterns, pattern],
+      });
+    }
+  },
+
+  removeCustomPattern: (patternId: string) => {
+    const { customPatterns } = get();
+    set({
+      customPatterns: customPatterns.filter((p) => p.id !== patternId),
+    });
+  },
+
+  getAllPatterns: () => {
+    const { customPatterns } = get();
+    return ProgressionManager.getPatternDefinitions(customPatterns);
+  },
+
+  applyPatternToSection: (patternId: string, root: number = 60) => {
+    const { customPatterns } = get();
+    const progression = ProgressionManager.applyPattern(
+      patternId,
+      { root },
+      customPatterns,
+    );
+
+    if (progression) {
+      get().setProgression(progression);
+    }
+  },
+
+  // ============================================================================
+  // Saved Progressions
+  // ============================================================================
+
+  saveProgression: (
+    name: string,
+    metadata?: Partial<ProgressionSnapshot["metadata"]>,
+  ) => {
+    const section = get().getCurrentSection();
+    const { uiMode } = get();
+    const snapshot = ProgressionManager.createProgressionSnapshot(
+      name,
+      getSectionProgression(section, uiMode),
+      metadata,
+    );
+
+    const { savedProgressions } = get();
+    set({
+      savedProgressions: {
+        ...savedProgressions,
+        [name]: snapshot,
+      },
+    });
+  },
+
+  loadProgression: (name: string) => {
+    const { savedProgressions } = get();
+    const snapshot = savedProgressions[name];
+
+    if (snapshot) {
+      const progression =
+        ProgressionManager.loadProgressionFromSnapshot(snapshot);
+      get().setProgression(progression);
+    }
+  },
+
+  deleteProgression: (name: string) => {
+    const { savedProgressions } = get();
+    const newProgressions = { ...savedProgressions };
+    delete newProgressions[name];
+    set({ savedProgressions: newProgressions });
+  },
+
+  getSavedProgressionNames: () => {
+    const { savedProgressions } = get();
+    return Object.keys(savedProgressions).sort();
+  },
+
+  // ============================================================================
+  // Utility Actions
+  // ============================================================================
+
+  reset: () => {
+    set(initialState);
+  },
+}));
